@@ -1,0 +1,102 @@
+@import '@fontsource/inter/400.css';
+@import '@fontsource/inter/500.css';
+@import '@fontsource/inter/600.css';
+@import '@fontsource/inter/700.css';
+@import 'tailwindcss';
+
+@theme {
+  --color-background: #ffffff;
+  --color-foreground: #18181b;
+  --color-card: #ffffff;
+  --color-card-foreground: #18181b;
+  --color-muted: #f0f1ed;
+  --color-muted-foreground: #6b7280;
+  --color-border: #e5e7eb;
+  --color-input: #ffffff;
+  --color-primary: #f97316;
+  --color-primary-foreground: #ffffff;
+  --color-secondary: #27272a;
+  --color-secondary-foreground: #ffffff;
+  --color-accent: #fff2e6;
+  --color-accent-foreground: #9a3412;
+  --color-destructive: #dc2626;
+  --color-destructive-foreground: #ffffff;
+  --color-ring: #fb923c;
+  --radius-sm: 0.625rem;
+  --radius-md: 1rem;
+  --radius-lg: 1.5rem;
+  --font-sans: 'Inter', sans-serif;
+}
+
+:root {
+  color: var(--color-foreground);
+  background: var(--color-background);
+  font-family: var(--font-sans);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--color-background);
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100svh;
+  background: #ffffff;
+  color: var(--color-foreground);
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+#root {
+  min-height: 100svh;
+}
+
+.vehicle-carousel-slide {
+  will-change: transform, opacity;
+}
+
+.vehicle-carousel-enter-right {
+  animation: vehicle-carousel-enter-right 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.vehicle-carousel-enter-left {
+  animation: vehicle-carousel-enter-left 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes vehicle-carousel-enter-right {
+  from {
+    transform: translateX(12%) scale(0.92);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateX(0) scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes vehicle-carousel-enter-left {
+  from {
+    transform: translateX(-12%) scale(0.92);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateX(0) scale(1);
+    opacity: 1;
+  }
+}
