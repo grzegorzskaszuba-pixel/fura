@@ -1,5 +1,5 @@
 import * as SelectPrimitive from '@radix-ui/react-select'
-import { Check, ChevronDown } from 'lucide-react'
+import { Check, ChevronDown, ChevronUp } from 'lucide-react'
 
 import { cn } from '@/shared/lib/utils'
 
@@ -25,10 +25,18 @@ export function SelectContent({ className, children, position = 'popper', ...pro
     <SelectPrimitive.Portal>
       <SelectPrimitive.Content
         position={position}
-        className={cn('z-50 overflow-hidden rounded-2xl border border-white/80 bg-card shadow-[0_18px_60px_rgba(15,23,42,0.14)]', className)}
+        className={cn('z-[70] overflow-hidden rounded-2xl border border-white/80 bg-card shadow-[0_18px_60px_rgba(15,23,42,0.14)]', className)}
         {...props}
       >
-        <SelectPrimitive.Viewport className="p-2">{children}</SelectPrimitive.Viewport>
+        <SelectPrimitive.ScrollUpButton className="flex h-8 items-center justify-center text-zinc-500">
+          <ChevronUp className="h-4 w-4" />
+        </SelectPrimitive.ScrollUpButton>
+        <SelectPrimitive.Viewport className="max-h-[min(18rem,var(--radix-select-content-available-height))] overflow-y-auto overscroll-contain p-2 touch-pan-y">
+          {children}
+        </SelectPrimitive.Viewport>
+        <SelectPrimitive.ScrollDownButton className="flex h-8 items-center justify-center text-zinc-500">
+          <ChevronDown className="h-4 w-4" />
+        </SelectPrimitive.ScrollDownButton>
       </SelectPrimitive.Content>
     </SelectPrimitive.Portal>
   )

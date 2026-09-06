@@ -136,6 +136,17 @@ function toOptionalNumber(value: string) {
   return value === '' ? undefined : Number(value)
 }
 
+function toOptionalDecimal(value: string) {
+  const normalized = value.trim().replace(',', '.')
+
+  if (normalized === '') {
+    return undefined
+  }
+
+  const parsed = Number(normalized)
+  return Number.isNaN(parsed) ? undefined : parsed
+}
+
 function toServiceEventFormDefaults(event?: ServiceEvent | null): ServiceEventValues {
   if (!event) {
     return emptyValues
@@ -445,30 +456,30 @@ export function ServiceEventForm({
             <Label htmlFor="service-labor">Koszty usługi</Label>
             <Input
               id="service-labor"
-              type="number"
+              type="text"
               inputMode="decimal"
-              placeholder="0"
-              {...form.register('laborCost', { setValueAs: toOptionalNumber })}
+              placeholder="np. 345,55"
+              {...form.register('laborCost', { setValueAs: toOptionalDecimal })}
             />
           </div>
           <div className="space-y-2">
             <Label htmlFor="service-parts">Koszty części</Label>
             <Input
               id="service-parts"
-              type="number"
+              type="text"
               inputMode="decimal"
-              placeholder="0"
-              {...form.register('partsCost', { setValueAs: toOptionalNumber })}
+              placeholder="np. 120,00"
+              {...form.register('partsCost', { setValueAs: toOptionalDecimal })}
             />
           </div>
           <div className="space-y-2">
             <Label htmlFor="service-other">Inne koszty</Label>
             <Input
               id="service-other"
-              type="number"
+              type="text"
               inputMode="decimal"
-              placeholder="0"
-              {...form.register('otherCost', { setValueAs: toOptionalNumber })}
+              placeholder="np. 24,90"
+              {...form.register('otherCost', { setValueAs: toOptionalDecimal })}
             />
           </div>
           <div className="space-y-2 sm:col-span-3">
