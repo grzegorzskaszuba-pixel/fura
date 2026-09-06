@@ -1,5 +1,6 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
+import { Pool } from 'pg'
 
 const resolvedDbPath = process.env.AUTH_DB_FILE
   ? path.resolve(process.env.AUTH_DB_FILE)
@@ -14,6 +15,18 @@ const emptyState = {
   serviceEvents: [],
 }
 
+const storageMode = String(process.env.AUTH_STORAGE ?? '').trim().toLowerCase()
+const postgresUrl = String(process.env.AUTH_DATABASE_URL ?? process.env.DATABASE_URL ?? '').trim()
+const usePostgres = storageMode === 'postgres' || (storageMode.length === 0 && postgresUrl.length > 0)
+
+const pgPool = usePostgres
+  ? new Pool({
+      connectionString: postgresUrl,
+    })
+  : null
+
+let pgInitialized = false
+
 async function ensureStorageFile() {
   await mkdir(dataDir, { recursive: true })
 
@@ -24,32 +37,89 @@ async function ensureStorageFile() {
   }
 }
 
+function normalizeState(candidate) {
+  if (!candidate || !Array.isArray(candidate.profiles) || !Array.isArray(candidate.credentials)) {
+    return structuredClone(emptyState)
+  }
+
+  const normalized = {
+    profiles: candidate.profiles,
+    credentials: candidate.credentials,
+    vehicles: Array.isArray(candidate.vehicles) ? candidate.vehicles : [],
+    serviceEvents: Array.isArray(candidate.serviceEvents) ? candidate.serviceEvents : [],
+  }
+
+  return normalized
+}
+
+async function ensurePostgresStorage() {
+  if (!pgPool) {
+    throw new Error('Postgres storage is not initialized')
+  }
+
+  if (pgInitialized) {
+    return
+  }
+
+  await pgPool.query(`
+    CREATE TABLE IF NOT EXISTS app_state (
+      id SMALLINT PRIMARY KEY,
+      state JSONB NOT NULL,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      CHECK (id = 1)
+    )
+  `)
+
+  await pgPool.query('INSERT INTO app_state (id, state) VALUES (1, $1::jsonb) ON CONFLICT (id) DO NOTHING', [JSON.stringify(emptyState)])
+  pgInitialized = true
+}
+
+async function readStatePostgres() {
+  if (!pgPool) {
+    throw new Error('Postgres storage is not initialized')
+  }
+
+  await ensurePostgresStorage()
+  const result = await pgPool.query('SELECT state FROM app_state WHERE id = 1 LIMIT 1')
+  const candidate = result.rows[0]?.state ?? emptyState
+  return normalizeState(candidate)
+}
+
+async function writeStatePostgres(nextState) {
+  if (!pgPool) {
+    throw new Error('Postgres storage is not initialized')
+  }
+
+  await ensurePostgresStorage()
+  const serializedState = JSON.stringify(normalizeState(nextState))
+  const result = await pgPool.query('UPDATE app_state SET state = $1::jsonb, updated_at = NOW() WHERE id = 1', [serializedState])
+
+  if (result.rowCount === 0) {
+    await pgPool.query('INSERT INTO app_state (id, state) VALUES (1, $1::jsonb)', [serializedState])
+  }
+}
+
 export async function readState() {
+  if (usePostgres) {
+    return readStatePostgres()
+  }
+
   await ensureStorageFile()
   const content = await readFile(dbPath, 'utf8')
 
   try {
-    const parsed = JSON.parse(content)
-
-    if (!parsed || !Array.isArray(parsed.profiles) || !Array.isArray(parsed.credentials)) {
-      return structuredClone(emptyState)
-    }
-
-    if (!Array.isArray(parsed.vehicles)) {
-      parsed.vehicles = []
-    }
-
-    if (!Array.isArray(parsed.serviceEvents)) {
-      parsed.serviceEvents = []
-    }
-
-    return parsed
+    return normalizeState(JSON.parse(content))
   } catch {
     return structuredClone(emptyState)
   }
 }
 
 export async function writeState(nextState) {
+  if (usePostgres) {
+    await writeStatePostgres(nextState)
+    return
+  }
+
   await ensureStorageFile()
-  await writeFile(dbPath, JSON.stringify(nextState, null, 2), 'utf8')
+  await writeFile(dbPath, JSON.stringify(normalizeState(nextState), null, 2), 'utf8')
 }
