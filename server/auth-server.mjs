@@ -115,9 +115,36 @@ function createSession(profileId) {
   return sessionId
 }
 
-function getAuthenticatedProfileId(request) {
+function readBearerSessionId(request) {
+  const authHeader = request.headers.authorization
+
+  if (typeof authHeader !== 'string') {
+    return null
+  }
+
+  const trimmed = authHeader.trim()
+
+  if (!trimmed.toLowerCase().startsWith('bearer ')) {
+    return null
+  }
+
+  const token = trimmed.slice(7).trim()
+  return token.length > 0 ? token : null
+}
+
+function getRequestSessionId(request) {
+  const bearerSessionId = readBearerSessionId(request)
+
+  if (bearerSessionId) {
+    return bearerSessionId
+  }
+
   const cookies = readCookies(request)
-  return getSessionProfileId(sessions, cookies[SESSION_COOKIE])
+  return cookies[SESSION_COOKIE] ?? null
+}
+
+function getAuthenticatedProfileId(request) {
+  return getSessionProfileId(sessions, getRequestSessionId(request))
 }
 
 function normalizeOptionalString(value) {
@@ -246,15 +273,13 @@ async function handleAuthRequest(request, response) {
   }
 
   if (pathname === '/api/auth/session' && method === 'GET') {
-    const cookies = readCookies(request)
-    const profileId = getSessionProfileId(sessions, cookies[SESSION_COOKIE])
+    const profileId = getSessionProfileId(sessions, getRequestSessionId(request))
     setJson(response, 200, { profileId })
     return
   }
 
   if (pathname === '/api/auth/logout' && method === 'POST') {
-    const cookies = readCookies(request)
-    const sessionId = cookies[SESSION_COOKIE]
+    const sessionId = getRequestSessionId(request)
 
     if (sessionId) {
       sessions.delete(sessionId)
@@ -583,7 +608,7 @@ async function handleAuthRequest(request, response) {
 
     const sessionId = createSession(profile.id)
     setSessionCookie(response, sessionId)
-    setJson(response, 200, { profile })
+    setJson(response, 200, { profile, sessionId })
     return
   }
 
@@ -594,13 +619,12 @@ async function handleAuthRequest(request, response) {
 
     const sessionId = createSession(profile.id)
     setSessionCookie(response, sessionId)
-    setJson(response, 200, { profile })
+    setJson(response, 200, { profile, sessionId })
     return
   }
 
   if (pathname === '/api/auth/reset-password' && method === 'POST') {
-    const cookies = readCookies(request)
-    const sessionProfileId = getSessionProfileId(sessions, cookies[SESSION_COOKIE])
+    const sessionProfileId = getSessionProfileId(sessions, getRequestSessionId(request))
 
     if (!sessionProfileId) {
       setJson(response, 403, { message: 'Brak aktywnej sesji profilu' })
@@ -625,8 +649,7 @@ async function handleAuthRequest(request, response) {
 
   if (pathname === '/api/auth/change-password' && method === 'POST') {
     const payload = await readJsonBody(request)
-    const cookies = readCookies(request)
-    const sessionProfileId = getSessionProfileId(sessions, cookies[SESSION_COOKIE])
+    const sessionProfileId = getSessionProfileId(sessions, getRequestSessionId(request))
 
     if (!sessionProfileId || sessionProfileId !== payload.profileId) {
       setJson(response, 403, { message: 'Brak aktywnej sesji profilu' })

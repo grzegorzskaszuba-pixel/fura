@@ -2,10 +2,12 @@ import type { AuthService } from '@/features/auth/auth-service'
 import { appStateRepository } from '@/data/repositories/app-state-repository'
 import { appConfig } from '@/shared/config/app-config'
 import { httpRequest } from '@/shared/lib/http-client'
+import { clearSessionToken, setSessionToken } from '@/shared/lib/session-token'
 import type { LoginCredentials, RegisterCredentials, UserProfile } from '@/shared/types/domain'
 
 interface AuthResponse {
   profile: UserProfile
+  sessionId?: string
 }
 
 interface SessionResponse {
@@ -17,6 +19,9 @@ export class RemoteAuthService implements AuthService {
 
   async getCurrentProfileId() {
     const response = await httpRequest<SessionResponse>(`${this.baseUrl}/session`)
+    if (!response.profileId) {
+      clearSessionToken()
+    }
     await appStateRepository.setCurrentProfileId(response.profileId)
     return response.profileId
   }
@@ -26,6 +31,8 @@ export class RemoteAuthService implements AuthService {
       method: 'POST',
       body: input,
     })
+
+    setSessionToken(response.sessionId)
 
     await appStateRepository.setCurrentProfileId(response.profile.id)
 
@@ -37,6 +44,8 @@ export class RemoteAuthService implements AuthService {
       method: 'POST',
       body: input,
     })
+
+    setSessionToken(response.sessionId)
 
     await appStateRepository.setCurrentProfileId(response.profile.id)
 
@@ -63,6 +72,7 @@ export class RemoteAuthService implements AuthService {
       method: 'POST',
     })
 
+    clearSessionToken()
     await appStateRepository.setCurrentProfileId(null)
   }
 }

@@ -1,3 +1,5 @@
+import { getSessionToken } from '@/shared/lib/session-token'
+
 interface HttpRequestInit extends Omit<RequestInit, 'body'> {
   body?: unknown
 }
@@ -15,6 +17,12 @@ export class HttpError extends Error {
 export async function httpRequest<TResponse>(url: string, init?: HttpRequestInit): Promise<TResponse> {
   const headers = new Headers(init?.headers)
   headers.set('Accept', 'application/json')
+
+  const sessionToken = getSessionToken()
+
+  if (sessionToken && !headers.has('Authorization')) {
+    headers.set('Authorization', `Bearer ${sessionToken}`)
+  }
 
   if (init?.body !== undefined && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json')
