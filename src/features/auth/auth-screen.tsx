@@ -67,12 +67,12 @@ export function AuthScreen({ onLogin, onRegister, onResetPassword, allowResetPas
     <main className="mx-auto flex min-h-svh w-full max-w-xl items-center px-4 py-6 sm:px-6">
       <Card className="w-full bg-white/92">
         <CardContent className="p-6 sm:p-8 lg:p-10">
-          <div className="mx-auto max-w-md space-y-6">
-            <div className="space-y-3">
-              <div className="inline-flex items-center rounded-full border border-zinc-200 bg-zinc-100 px-3 py-2">
-                <span className="text-3xl font-semibold tracking-[-0.08em] text-zinc-950 sm:text-5xl">FURA</span>
+          <div className="mx-auto max-w-md space-y-7">
+            <div className="space-y-4">
+              <div className="inline-flex items-center rounded-full border border-zinc-900 bg-zinc-950 px-3 py-2">
+                <span className="text-3xl font-semibold tracking-[-0.08em] text-white sm:text-5xl">FURA</span>
               </div>
-              <p className="text-sm leading-6 text-zinc-500 sm:text-base">Prosty dziennik serwisowy dla każdego auta.</p>
+              <p className="text-base font-medium leading-7 text-zinc-950 sm:text-lg">Prosty dziennik serwisowy dla każdego auta.</p>
               <p className="text-sm leading-6 text-zinc-500">Zaloguj się lub utwórz profil.</p>
               {startupError ? <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">{startupError}</p> : null}
             </div>

@@ -217,6 +217,7 @@ export function ServiceEventForm({
   const status = form.watch('status')
   const isRecurring = form.watch('isRecurring') ?? false
   const recurrenceType = form.watch('recurrenceType') ?? 'time'
+  const isSubmitting = form.formState.isSubmitting
   const totalCost = (form.watch('laborCost') ?? 0) + (form.watch('partsCost') ?? 0) + (form.watch('otherCost') ?? 0)
   const totalCostDisplay = new Intl.NumberFormat('pl-PL', {
     minimumFractionDigits: 2,
@@ -554,10 +555,11 @@ export function ServiceEventForm({
 
         <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-end">
           {submitError ? <p className="text-sm text-red-600 sm:mr-auto">{submitError}</p> : null}
-          <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
+          <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
             Anuluj
           </Button>
-          <Button type="submit" data-testid="service-submit">
+          <Button type="submit" data-testid="service-submit" disabled={isSubmitting} aria-busy={isSubmitting}>
+            {isSubmitting ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" aria-hidden="true" /> : null}
             {initialValues ? 'Zapisz wpis' : form.watch('status') === 'completed' ? 'Dodaj serwis' : 'Zaplanuj serwis'}
           </Button>
         </div>
