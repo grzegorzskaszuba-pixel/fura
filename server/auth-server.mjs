@@ -14,6 +14,11 @@ import { readState, writeState } from './storage.mjs'
 const PORT = Number(process.env.AUTH_API_PORT ?? process.env.PORT ?? 8787)
 const HOST = process.env.AUTH_API_HOST ?? '0.0.0.0'
 const SESSION_COOKIE = 'fura_session'
+const COOKIE_SAME_SITE = String(process.env.AUTH_COOKIE_SAME_SITE ?? 'Lax')
+const COOKIE_SECURE =
+  String(process.env.AUTH_COOKIE_SECURE ?? '').trim().toLowerCase() === 'true' ||
+  COOKIE_SAME_SITE.toLowerCase() === 'none' ||
+  process.env.RENDER === 'true'
 const ALLOWED_ORIGINS = String(process.env.AUTH_API_ALLOWED_ORIGINS ?? '*')
   .split(',')
   .map((origin) => origin.trim())
@@ -72,11 +77,16 @@ function readCookies(request) {
 }
 
 function setSessionCookie(response, sessionId) {
-  response.setHeader('Set-Cookie', `${SESSION_COOKIE}=${encodeURIComponent(sessionId)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=604800`)
+  const secureAttr = COOKIE_SECURE ? '; Secure' : ''
+  response.setHeader(
+    'Set-Cookie',
+    `${SESSION_COOKIE}=${encodeURIComponent(sessionId)}; HttpOnly; SameSite=${COOKIE_SAME_SITE}; Path=/; Max-Age=604800${secureAttr}`,
+  )
 }
 
 function clearSessionCookie(response) {
-  response.setHeader('Set-Cookie', `${SESSION_COOKIE}=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0`)
+  const secureAttr = COOKIE_SECURE ? '; Secure' : ''
+  response.setHeader('Set-Cookie', `${SESSION_COOKIE}=; HttpOnly; SameSite=${COOKIE_SAME_SITE}; Path=/; Max-Age=0${secureAttr}`)
 }
 
 async function readJsonBody(request) {
