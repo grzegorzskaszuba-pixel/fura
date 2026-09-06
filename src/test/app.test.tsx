@@ -10,10 +10,9 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
-async function loginToDemo() {
+async function openAppSession() {
   const user = userEvent.setup()
   render(<App />)
-  await user.click(await screen.findByTestId('demo-login'))
   await screen.findByTestId('active-vehicle-name')
 
   return user
@@ -21,7 +20,7 @@ async function loginToDemo() {
 
 describe('App MVP flow', () => {
   it('switches the active vehicle', async () => {
-    const user = await loginToDemo()
+    const user = await openAppSession()
     const currentVehicleName = screen.getByTestId('active-vehicle-name').textContent ?? ''
     const nextVehicleName = currentVehicleName.includes('BMW 320d') ? 'Audi Q5' : 'BMW 320d'
 
@@ -33,7 +32,7 @@ describe('App MVP flow', () => {
   })
 
   it('adds a vehicle', async () => {
-    const user = await loginToDemo()
+    const user = await openAppSession()
     const imageFile = new File(['vehicle-image'], 'octavia.png', { type: 'image/png' })
 
     await user.click(screen.getByLabelText('Menu auta'))
@@ -43,7 +42,6 @@ describe('App MVP flow', () => {
     await user.type(screen.getByLabelText('Model'), 'Octavia')
     await user.type(screen.getByLabelText('Rok'), '2022')
     await user.type(screen.getByLabelText('Przebieg'), '15500')
-    await user.click(screen.getByText('Więcej informacji'))
     expect(screen.getByLabelText('Typ nadwozia')).toBeInTheDocument()
     expect(screen.getByLabelText('Skrzynia')).toBeInTheDocument()
     await user.type(screen.getByLabelText('Moc'), '200')
@@ -61,7 +59,7 @@ describe('App MVP flow', () => {
   })
 
   it('adds a completed service event', async () => {
-    const user = await loginToDemo()
+    const user = await openAppSession()
     const attachmentFiles = [
       new File(['invoice'], 'faktura.pdf', { type: 'application/pdf' }),
       new File(['parts'], 'czesci.csv', { type: 'text/csv' }),
@@ -148,7 +146,7 @@ describe('App MVP flow', () => {
   })
 
   it('plans a service and shows it in the plan tab', async () => {
-    const user = await loginToDemo()
+    const user = await openAppSession()
 
     await user.click(screen.getByTestId('plan-service-button'))
     await user.clear(screen.getByLabelText('Tytuł'))
@@ -168,7 +166,7 @@ describe('App MVP flow', () => {
   })
 
   it('switches between history and plan tabs', async () => {
-    const user = await loginToDemo()
+    const user = await openAppSession()
 
     await user.click(screen.getByTestId('tab-plan'))
     await waitFor(() => {
@@ -185,7 +183,7 @@ describe('App MVP flow', () => {
     Object.defineProperty(window, 'innerWidth', { configurable: true, value: 390 })
     window.dispatchEvent(new Event('resize'))
 
-    await loginToDemo()
+    await openAppSession()
 
     await waitFor(() => {
       expect(screen.getByTestId('add-service-button')).toBeVisible()

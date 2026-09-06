@@ -1,13 +1,16 @@
 import Dexie, { type EntityTable } from 'dexie'
 
-import { demoAppState, demoProfiles, demoServiceEvents, demoVehicles } from '@/data/seed/demo-data'
-import type { AppStateRecord, ServiceEvent, UserProfile, Vehicle } from '@/shared/types/domain'
+import type { AppStateRecord, AuthCredentialRecord, ServiceEvent, UserProfile, Vehicle } from '@/shared/types/domain'
 
-const APP_DB_NAME = 'fura-demo-db'
-const LEGACY_DB_NAME = 'carlog-demo-db'
+const APP_DB_NAME = 'fura-app-db'
+const LEGACY_DB_NAMES = ['fura-demo-db', 'carlog-demo-db']
+const DEMO_PROFILE_IDS = new Set(['profile-demo-main', 'profile-demo-second'])
+const DEMO_USERNAMES = new Set(['demo', 'ania'])
+const CURRENT_PROFILE_KEY = 'currentProfileId'
 
 class FuraDatabase extends Dexie {
   profiles!: EntityTable<UserProfile, 'id'>
+  authCredentials!: EntityTable<AuthCredentialRecord, 'profileId'>
   vehicles!: EntityTable<Vehicle, 'id'>
   serviceEvents!: EntityTable<ServiceEvent, 'id'>
   appState!: EntityTable<AppStateRecord, 'key'>
@@ -15,8 +18,9 @@ class FuraDatabase extends Dexie {
   constructor() {
     super(APP_DB_NAME)
 
-    this.version(2).stores({
+    this.version(3).stores({
       profiles: 'id, username, updatedAt',
+      authCredentials: 'profileId, username, updatedAt',
       vehicles: 'id, profileId, updatedAt, archived',
       serviceEvents: 'id, [profileId+vehicleId], profileId, vehicleId, status, eventDate, mileage, updatedAt',
       appState: 'key',
@@ -24,14 +28,14 @@ class FuraDatabase extends Dexie {
   }
 }
 
-class LegacyCarlogDatabase extends Dexie {
+class LegacyDatabase extends Dexie {
   profiles!: EntityTable<UserProfile, 'id'>
   vehicles!: EntityTable<Vehicle, 'id'>
   serviceEvents!: EntityTable<ServiceEvent, 'id'>
   appState!: EntityTable<AppStateRecord, 'key'>
 
-  constructor() {
-    super(LEGACY_DB_NAME)
+  constructor(name: string) {
+    super(name)
 
     this.version(2).stores({
       profiles: 'id, username, updatedAt',
@@ -44,128 +48,136 @@ class LegacyCarlogDatabase extends Dexie {
 
 export const db = new FuraDatabase()
 
-async function migrateLegacyDemoData() {
-  const migrated = await db.appState.get('migrated-from-carlog')
-
-  if (migrated?.value === 'true') {
-    return
-  }
-
-  const [profilesCount, vehiclesCount, serviceEventsCount, appStateCount] = await Promise.all([
+async function hasApplicationData() {
+  const [profilesCount, credentialsCount, vehiclesCount, serviceEventsCount, appStateCount] = await Promise.all([
     db.profiles.count(),
+    db.authCredentials.count(),
     db.vehicles.count(),
     db.serviceEvents.count(),
     db.appState.count(),
   ])
 
-  if (profilesCount + vehiclesCount + serviceEventsCount + appStateCount > 0) {
-    await db.appState.put({ key: 'migrated-from-carlog', value: 'true' })
+  return profilesCount + credentialsCount + vehiclesCount + serviceEventsCount + appStateCount > 0
+}
+
+async function migrateLegacyData() {
+  if (await hasApplicationData()) {
     return
   }
 
-  const legacyDb = new LegacyCarlogDatabase()
+  for (const legacyName of LEGACY_DB_NAMES) {
+    const legacyDb = new LegacyDatabase(legacyName)
 
-  try {
-    await legacyDb.open()
+    try {
+      await legacyDb.open()
 
-    const [legacyProfiles, legacyVehicles, legacyServiceEvents, legacyAppState] = await Promise.all([
-      legacyDb.profiles.toArray(),
-      legacyDb.vehicles.toArray(),
-      legacyDb.serviceEvents.toArray(),
-      legacyDb.appState.toArray(),
+      const [profiles, vehicles, serviceEvents, appState] = await Promise.all([
+        legacyDb.profiles.toArray(),
+        legacyDb.vehicles.toArray(),
+        legacyDb.serviceEvents.toArray(),
+        legacyDb.appState.toArray(),
+      ])
+
+      if (profiles.length + vehicles.length + serviceEvents.length + appState.length === 0) {
+        continue
+      }
+
+      await db.transaction('rw', db.profiles, db.vehicles, db.serviceEvents, db.appState, async () => {
+        if (profiles.length > 0) {
+          await db.profiles.bulkPut(profiles)
+        }
+        if (vehicles.length > 0) {
+          await db.vehicles.bulkPut(vehicles)
+        }
+        if (serviceEvents.length > 0) {
+          await db.serviceEvents.bulkPut(serviceEvents)
+        }
+        if (appState.length > 0) {
+          await db.appState.bulkPut(appState)
+        }
+      })
+
+      return
+    } catch {
+      // Continue with the next legacy database candidate.
+    } finally {
+      legacyDb.close()
+    }
+  }
+}
+
+function isDemoProfile(profile: UserProfile) {
+  return DEMO_PROFILE_IDS.has(profile.id) || DEMO_USERNAMES.has(profile.username.toLowerCase())
+}
+
+async function removeProfiles(profileIds: string[]) {
+  if (profileIds.length === 0) {
+    return
+  }
+
+  await db.transaction('rw', db.profiles, db.authCredentials, db.vehicles, db.serviceEvents, db.appState, async () => {
+    const [vehicles, events, currentProfileId] = await Promise.all([
+      db.vehicles.toArray(),
+      db.serviceEvents.toArray(),
+      db.appState.get(CURRENT_PROFILE_KEY),
     ])
 
-    if (legacyProfiles.length + legacyVehicles.length + legacyServiceEvents.length + legacyAppState.length === 0) {
-      return
+    const scopedVehicleIds = vehicles.filter((vehicle) => profileIds.includes(vehicle.profileId)).map((vehicle) => vehicle.id)
+    const scopedEventIds = events.filter((event) => profileIds.includes(event.profileId)).map((event) => event.id)
+
+    if (scopedEventIds.length > 0) {
+      await db.serviceEvents.bulkDelete(scopedEventIds)
     }
 
-    await db.transaction('rw', db.profiles, db.vehicles, db.serviceEvents, db.appState, async () => {
-      if (legacyProfiles.length > 0) {
-        await db.profiles.bulkPut(legacyProfiles)
-      }
-      if (legacyVehicles.length > 0) {
-        await db.vehicles.bulkPut(legacyVehicles)
-      }
-      if (legacyServiceEvents.length > 0) {
-        await db.serviceEvents.bulkPut(legacyServiceEvents)
-      }
-      if (legacyAppState.length > 0) {
-        await db.appState.bulkPut(legacyAppState)
-      }
-      await db.appState.put({ key: 'migrated-from-carlog', value: 'true' })
-    })
-  } catch {
-    // Ignore migration errors and fall back to regular initialization below.
-  } finally {
-    legacyDb.close()
+    if (scopedVehicleIds.length > 0) {
+      await db.vehicles.bulkDelete(scopedVehicleIds)
+    }
+
+    await db.authCredentials.bulkDelete(profileIds)
+    await db.profiles.bulkDelete(profileIds)
+
+    if (currentProfileId?.value && profileIds.includes(currentProfileId.value)) {
+      await db.appState.delete(CURRENT_PROFILE_KEY)
+    }
+
+    await db.appState.delete('seeded')
+  })
+}
+
+async function removeDemoData() {
+  const profiles = await db.profiles.toArray()
+  const demoProfileIds = profiles.filter(isDemoProfile).map((profile) => profile.id)
+
+  await removeProfiles(demoProfileIds)
+}
+
+async function removeProfilesWithoutCredentials() {
+  const [profiles, credentials] = await Promise.all([db.profiles.toArray(), db.authCredentials.toArray()])
+  const profileIdsWithCredentials = new Set(credentials.map((item) => item.profileId))
+  const staleProfileIds = profiles.filter((profile) => !profileIdsWithCredentials.has(profile.id)).map((profile) => profile.id)
+
+  await removeProfiles(staleProfileIds)
+}
+
+async function ensureCurrentProfileExists() {
+  const currentProfileId = await db.appState.get(CURRENT_PROFILE_KEY)
+
+  if (!currentProfileId?.value) {
+    return
+  }
+
+  const [profile, credentials] = await Promise.all([db.profiles.get(currentProfileId.value), db.authCredentials.get(currentProfileId.value)])
+
+  if (!profile || !credentials) {
+    await db.appState.delete(CURRENT_PROFILE_KEY)
   }
 }
 
 export async function initializeDatabase() {
-  await migrateLegacyDemoData()
-
-  const seeded = await db.appState.get('seeded')
-  const [demoProfile, demoVehicle, demoEvent] = await Promise.all([
-    db.profiles.get('profile-demo-main'),
-    db.vehicles.get('vehicle-bmw-320d'),
-    db.serviceEvents.get('event-bmw-oil'),
-  ])
-
-  if (seeded?.value === 'true' && demoProfile && demoVehicle && demoEvent) {
-    await db.transaction('rw', db.vehicles, db.serviceEvents, async () => {
-      await Promise.all(
-        demoVehicles.map(async (vehicle) => {
-          const existing = await db.vehicles.get(vehicle.id)
-
-          if (!existing || existing.imageUrl === vehicle.imageUrl) {
-            return
-          }
-
-          await db.vehicles.update(vehicle.id, { imageUrl: vehicle.imageUrl })
-        }),
-      )
-
-      await Promise.all(
-        demoServiceEvents.map(async (event) => {
-          const existing = await db.serviceEvents.get(event.id)
-
-          if (!existing) {
-            return
-          }
-
-          const nextSignature = JSON.stringify({
-            attachmentCount: event.attachmentCount,
-            attachmentNames: event.attachmentNames,
-            attachments: event.attachments,
-          })
-          const existingSignature = JSON.stringify({
-            attachmentCount: existing.attachmentCount,
-            attachmentNames: existing.attachmentNames,
-            attachments: existing.attachments,
-          })
-
-          if (existingSignature === nextSignature) {
-            return
-          }
-
-          await db.serviceEvents.update(event.id, {
-            attachmentCount: event.attachmentCount,
-            attachmentNames: event.attachmentNames,
-            attachments: event.attachments,
-          })
-        }),
-      )
-    })
-
-    return
-  }
-
-  await db.transaction('rw', db.profiles, db.vehicles, db.serviceEvents, db.appState, async () => {
-    await db.profiles.bulkPut(demoProfiles)
-    await db.vehicles.bulkPut(demoVehicles)
-    await db.serviceEvents.bulkPut(demoServiceEvents)
-    await db.appState.bulkPut(demoAppState)
-  })
+  await migrateLegacyData()
+  await removeDemoData()
+  await removeProfilesWithoutCredentials()
+  await ensureCurrentProfileExists()
 }
 
 export async function resetDatabase() {

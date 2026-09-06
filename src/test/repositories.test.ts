@@ -1,26 +1,65 @@
 import { describe, expect, it } from 'vitest'
 
+import { profileRepository } from '@/data/repositories/profile-repository'
 import { serviceEventRepository } from '@/data/repositories/service-event-repository'
 import { vehicleRepository } from '@/data/repositories/vehicle-repository'
 
 describe('Repositories', () => {
   it('filters vehicles by profileId', async () => {
-    const vehicles = await vehicleRepository.listByProfile('profile-demo-main')
+    const primaryProfile = await profileRepository.create({ username: 'repo-1', displayName: 'Repo 1' })
+    const secondaryProfile = await profileRepository.create({ username: 'repo-2', displayName: 'Repo 2' })
+
+    await vehicleRepository.create(primaryProfile.id, {
+      name: 'BMW 320d',
+      make: 'BMW',
+      model: '320d',
+    })
+    await vehicleRepository.create(primaryProfile.id, {
+      name: 'Audi Q5',
+      make: 'Audi',
+      model: 'Q5',
+    })
+    await vehicleRepository.create(secondaryProfile.id, {
+      name: 'Seat Leon',
+      make: 'Seat',
+      model: 'Leon',
+    })
+
+    const vehicles = await vehicleRepository.listByProfile(primaryProfile.id)
 
     expect(vehicles).toHaveLength(2)
-    expect(vehicles.every((vehicle) => vehicle.profileId === 'profile-demo-main')).toBe(true)
+    expect(vehicles.every((vehicle) => vehicle.profileId === primaryProfile.id)).toBe(true)
   })
 
   it('filters service events by profileId and vehicleId', async () => {
-    const events = await serviceEventRepository.listByVehicle('profile-demo-main', 'vehicle-bmw-320d')
+    const profile = await profileRepository.create({ username: 'repo-events', displayName: 'Repo Events' })
+    const vehicle = await vehicleRepository.create(profile.id, {
+      name: 'BMW 320d',
+      make: 'BMW',
+      model: '320d',
+    })
+
+    await serviceEventRepository.create(profile.id, vehicle.id, {
+      status: 'completed',
+      category: 'repair',
+      title: 'Wymiana żarówki',
+    })
+    await serviceEventRepository.create(profile.id, vehicle.id, {
+      status: 'planned',
+      category: 'inspection',
+      title: 'Przegląd okresowy',
+    })
+
+    const events = await serviceEventRepository.listByVehicle(profile.id, vehicle.id)
 
     expect(events.length).toBeGreaterThan(0)
-    expect(events.every((event) => event.profileId === 'profile-demo-main')).toBe(true)
-    expect(events.every((event) => event.vehicleId === 'vehicle-bmw-320d')).toBe(true)
+    expect(events.every((event) => event.profileId === profile.id)).toBe(true)
+    expect(events.every((event) => event.vehicleId === vehicle.id)).toBe(true)
   })
 
   it('persists added vehicle fields including custom image', async () => {
-    const vehicle = await vehicleRepository.create('profile-demo-main', {
+    const profile = await profileRepository.create({ username: 'repo-custom', displayName: 'Repo Custom' })
+    const vehicle = await vehicleRepository.create(profile.id, {
       name: 'Skoda Octavia',
       make: 'Skoda',
       model: 'Octavia',
@@ -47,7 +86,13 @@ describe('Repositories', () => {
   })
 
   it('persists service attachment names', async () => {
-    const event = await serviceEventRepository.create('profile-demo-main', 'vehicle-bmw-320d', {
+    const profile = await profileRepository.create({ username: 'repo-attachments', displayName: 'Repo Attachments' })
+    const vehicle = await vehicleRepository.create(profile.id, {
+      name: 'BMW 320d',
+      make: 'BMW',
+      model: '320d',
+    })
+    const event = await serviceEventRepository.create(profile.id, vehicle.id, {
       status: 'completed',
       category: 'repair',
       title: 'Wymiana chłodnicy',
@@ -73,7 +118,13 @@ describe('Repositories', () => {
   })
 
   it('persists planned service recurrence settings', async () => {
-    const event = await serviceEventRepository.create('profile-demo-main', 'vehicle-bmw-320d', {
+    const profile = await profileRepository.create({ username: 'repo-planned', displayName: 'Repo Planned' })
+    const vehicle = await vehicleRepository.create(profile.id, {
+      name: 'BMW 320d',
+      make: 'BMW',
+      model: '320d',
+    })
+    const event = await serviceEventRepository.create(profile.id, vehicle.id, {
       status: 'planned',
       category: 'periodic_service',
       title: 'Wymiana oleju',

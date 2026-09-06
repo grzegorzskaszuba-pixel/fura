@@ -1,75 +1,110 @@
 import { db } from '@/data/database/db'
+import { appConfig } from '@/shared/config/app-config'
+import { httpRequest } from '@/shared/lib/http-client'
 import { generateId } from '@/shared/lib/utils'
 import type { Vehicle, VehicleFormValues } from '@/shared/types/domain'
 
+const vehiclesBaseUrl = `${appConfig.apiBaseUrl}/vehicles`
+
+function isRemoteMode() {
+  return appConfig.authMode === 'remote'
+}
+
+function toVehicleFormValues(input: VehicleFormValues) {
+  return {
+    name: input.name.trim(),
+    make: input.make.trim(),
+    model: input.model.trim(),
+    year: input.year,
+    bodyType: input.bodyType?.trim(),
+    fuelType: input.fuelType?.trim(),
+    transmission: input.transmission?.trim(),
+    engine: input.engine?.trim(),
+    power: input.power,
+    color: input.color?.trim(),
+    vin: input.vin?.trim(),
+    registrationNumber: input.registrationNumber?.trim(),
+    currentMileage: input.currentMileage,
+    imageUrl: input.imageUrl?.trim(),
+    notes: input.notes?.trim(),
+  }
+}
+
 export const vehicleRepository = {
   async listByProfile(profileId: string) {
-    return db.vehicles
-      .where('profileId')
-      .equals(profileId)
-      .filter((vehicle) => !vehicle.archived)
-      .sortBy('updatedAt')
+    if (!isRemoteMode()) {
+      const vehicles = await db.vehicles.where('profileId').equals(profileId).toArray()
+      return vehicles
+        .filter((vehicle) => !vehicle.archived)
+        .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))
+    }
+
+    const response = await httpRequest<{ vehicles: Vehicle[] }>(vehiclesBaseUrl)
+    return response.vehicles.filter((vehicle) => vehicle.profileId === profileId && !vehicle.archived)
+  },
+
+  async syncByProfile(profileId: string) {
+    void profileId
+    return
   },
 
   async getById(id: string) {
-    return db.vehicles.get(id)
+    if (!isRemoteMode()) {
+      return (await db.vehicles.get(id)) ?? null
+    }
+
+    const response = await httpRequest<{ vehicles: Vehicle[] }>(vehiclesBaseUrl)
+    return response.vehicles.find((vehicle) => vehicle.id === id) ?? null
   },
 
   async create(profileId: string, input: VehicleFormValues) {
-    const now = new Date().toISOString()
-    const vehicle: Vehicle = {
-      id: generateId(),
-      profileId,
-      name: input.name.trim(),
-      make: input.make.trim(),
-      model: input.model.trim(),
-      year: input.year,
-      bodyType: input.bodyType?.trim(),
-      fuelType: input.fuelType?.trim(),
-      transmission: input.transmission?.trim(),
-      engine: input.engine?.trim(),
-      power: input.power,
-      color: input.color?.trim(),
-      vin: input.vin?.trim(),
-      registrationNumber: input.registrationNumber?.trim(),
-      currentMileage: input.currentMileage,
-      imageUrl: input.imageUrl?.trim(),
-      notes: input.notes?.trim(),
-      archived: false,
-      createdAt: now,
-      updatedAt: now,
+    if (!isRemoteMode()) {
+      const now = new Date().toISOString()
+      const vehicle: Vehicle = {
+        id: `vehicle-${generateId()}`,
+        profileId,
+        archived: false,
+        createdAt: now,
+        updatedAt: now,
+        ...toVehicleFormValues(input),
+      }
+
+      await db.vehicles.add(vehicle)
+      return vehicle
     }
 
-    await db.vehicles.add(vehicle)
-    return vehicle
+    void profileId
+    const response = await httpRequest<{ vehicle: Vehicle }>(vehiclesBaseUrl, {
+      method: 'POST',
+      body: toVehicleFormValues(input),
+    })
+
+    return response.vehicle
   },
 
   async update(vehicleId: string, input: VehicleFormValues) {
-    const existing = await db.vehicles.get(vehicleId)
+    if (!isRemoteMode()) {
+      const existing = await db.vehicles.get(vehicleId)
 
-    if (!existing) {
-      throw new Error('Vehicle not found')
+      if (!existing) {
+        throw new Error('Pojazd nie istnieje')
+      }
+
+      const updatedVehicle: Vehicle = {
+        ...existing,
+        ...toVehicleFormValues(input),
+        updatedAt: new Date().toISOString(),
+      }
+
+      await db.vehicles.put(updatedVehicle)
+      return updatedVehicle
     }
 
-    const updated: Vehicle = {
-      ...existing,
-      ...input,
-      name: input.name.trim(),
-      make: input.make.trim(),
-      model: input.model.trim(),
-      bodyType: input.bodyType?.trim(),
-      fuelType: input.fuelType?.trim(),
-      transmission: input.transmission?.trim(),
-      engine: input.engine?.trim(),
-      color: input.color?.trim(),
-      imageUrl: input.imageUrl?.trim(),
-      vin: input.vin?.trim(),
-      registrationNumber: input.registrationNumber?.trim(),
-      notes: input.notes?.trim(),
-      updatedAt: new Date().toISOString(),
-    }
+    const response = await httpRequest<{ vehicle: Vehicle }>(`${vehiclesBaseUrl}/${vehicleId}`, {
+      method: 'PUT',
+      body: toVehicleFormValues(input),
+    })
 
-    await db.vehicles.put(updated)
-    return updated
+    return response.vehicle
   },
 }

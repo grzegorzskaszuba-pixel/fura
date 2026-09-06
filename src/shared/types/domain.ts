@@ -78,9 +78,29 @@ export interface AppStateRecord {
   value: string
 }
 
-export interface ProfileCredentials {
+export interface ProfileCreateInput {
   username: string
   displayName?: string
+}
+
+export interface LoginCredentials {
+  username: string
+  password: string
+}
+
+export interface RegisterCredentials {
+  username: string
+  password: string
+  displayName?: string
+}
+
+export interface AuthCredentialRecord {
+  profileId: string
+  username: string
+  passwordHash: string
+  passwordSalt: string
+  createdAt: string
+  updatedAt: string
 }
 
 export interface VehicleFormValues {

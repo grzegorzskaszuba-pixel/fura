@@ -5,15 +5,17 @@
 - `src/app`: kompozycja głównego ekranu i przepływ UI
 - `src/features`: logika ekranów i formularzy per obszar
 - `src/shared`: typy, helpery, stałe i współdzielone komponenty UI
-- `src/data/database`: konfiguracja Dexie i seed demo
+- `src/data/database`: konfiguracja Dexie i migracje lokalnej bazy
 - `src/data/repositories`: jedyne miejsce dostępu do IndexedDB
+- `src/features/auth`: kontrakt `AuthService` i adaptery `local` / `remote`
 
 ## Zasady
 
 - komponenty UI nie rozmawiają bezpośrednio z Dexie
 - dane są filtrowane po `profileId` już na poziomie repozytoriów
 - aktywny profil i aktywne auto są przechowywane osobno w `appState`
-- seed demo jest samonaprawialny: brak demo rekordów powoduje ponowne dosianie danych
+- profile i dane użytkownika są przechowywane lokalnie w IndexedDB, bez automatycznego seedowania
+- warstwa auth jest wymienna przez fabrykę serwisu (adapter pattern), bez wpływu na feature'y domenowe
 
 ## Główny przepływ
 

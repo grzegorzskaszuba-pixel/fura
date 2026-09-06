@@ -4,14 +4,25 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite --host 0.0.0.0",
+    "dev": "node scripts/dev-stack.mjs",
+    "dev:stack": "node scripts/dev-stack.mjs",
+    "dev:local": "node scripts/dev-stack.mjs",
+    "dev:remote": "node scripts/dev-stack.mjs",
+    "api": "node server/auth-server.mjs",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "lint": "oxlint .",
     "typecheck": "tsc -b",
     "test": "vitest --run",
+    "test:backend": "vitest --run server/test/auth-core.unit.test.ts",
+    "test:api": "vitest --run server/test/auth-api.integration.test.ts server/test/data-api.integration.test.ts",
+    "test:frontend": "vitest --run src/test/**/*.test.{ts,tsx}",
+    "test:regression": "vitest --run src/test/profile-isolation.regression.test.tsx src/test/auth-screen.regression.test.tsx server/test/auth-security.regression.test.ts",
+    "test:functional": "npm run test:frontend && npm run test:e2e",
+    "test:all": "npm run test:backend && npm run test:api && npm run test:frontend && npm run test:regression",
     "test:e2e": "playwright test",
-    "verify": "npm run lint && npm run typecheck && npm run test && npm run build"
+    "verify": "npm run lint && npm run typecheck && npm run test && npm run build",
+    "verify:full": "npm run verify && npm run test:e2e"
   },
   "dependencies": {
     "@fontsource/inter": "^5.3.0",

@@ -2,7 +2,7 @@
 
 ## Obecny etap
 
-Ta aplikacja jest lokalnym MVP. Demo auth i lokalna rejestracja służą tylko do odseparowania danych i zademonstrowania przepływu wielu profili.
+Ta aplikacja działa lokalnie i przechowuje profile oraz dane z hasłem w IndexedDB, aby odseparować dane między profilami.
 
 ## Czego aplikacja nie robi
 

@@ -12,7 +12,7 @@ AUTOlog ma dać właścicielowi auta jeden prosty ekran do pilnowania historii s
 
 ## Zakres MVP
 
-- logowanie demo i lokalna rejestracja profilu
+- lokalna rejestracja i logowanie profilem z hasłem
 - przełączanie profili
 - dodawanie, edycja i przełączanie aut
 - dodawanie wykonanych serwisów

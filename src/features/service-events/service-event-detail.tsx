@@ -246,7 +246,7 @@ export function ServiceEventDetail({ event, vehicle, open, onOpenChange, onEdit,
               <AlertDialogHeader>
                 <AlertDialogTitle>Usunąć wpis?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  Ta operacja usuwa wpis tylko z lokalnej bazy demo dla bieżącego profilu.
+                  Ta operacja usuwa wpis tylko z lokalnej bazy danych dla bieżącego profilu.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>

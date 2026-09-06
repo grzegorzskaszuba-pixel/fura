@@ -96,6 +96,7 @@ const emptyVehicleValues: VehicleValues = {
 export function VehicleForm({ open, onOpenChange, initialValues, onSubmit }: VehicleFormProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const [imageUploadError, setImageUploadError] = useState<string | null>(null)
+  const [submitError, setSubmitError] = useState<string | null>(null)
   const [selectedImageName, setSelectedImageName] = useState('')
   const form = useForm<VehicleValues>({
     resolver: zodResolver(vehicleSchema),
@@ -109,6 +110,7 @@ export function VehicleForm({ open, onOpenChange, initialValues, onSubmit }: Veh
     }
 
     setImageUploadError(null)
+    setSubmitError(null)
     setSelectedImageName('')
     form.reset(
       initialValues ? toVehicleFormDefaults(initialValues) : emptyVehicleValues,
@@ -116,8 +118,14 @@ export function VehicleForm({ open, onOpenChange, initialValues, onSubmit }: Veh
   }, [form, initialValues, open])
 
   async function handleSubmit(values: VehicleValues) {
-    await onSubmit(values)
-    onOpenChange(false)
+    setSubmitError(null)
+
+    try {
+      await onSubmit(values)
+      onOpenChange(false)
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : 'Nie udalo sie zapisac auta')
+    }
   }
 
   async function handleImageFileChange(event: React.ChangeEvent<HTMLInputElement>) {
@@ -162,7 +170,7 @@ export function VehicleForm({ open, onOpenChange, initialValues, onSubmit }: Veh
       open={open}
       onOpenChange={onOpenChange}
       title={initialValues ? 'Edytuj auto' : 'Dodaj auto'}
-      description="Podstawowe dane są krótkie. Reszta jest schowana niżej."
+      description="Wszystkie dane auta uzupełnisz w tym formularzu."
     >
       <form className="space-y-4" onSubmit={form.handleSubmit(handleSubmit)}>
         <div className="grid gap-4 sm:grid-cols-2">
@@ -201,110 +209,108 @@ export function VehicleForm({ open, onOpenChange, initialValues, onSubmit }: Veh
           </div>
         </div>
 
-        <details className="rounded-3xl border border-zinc-200 bg-zinc-50 px-4 py-3">
-          <summary className="cursor-pointer list-none text-sm font-semibold text-zinc-900">Więcej informacji</summary>
-          <div className="mt-4 grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="vehicle-body">Typ nadwozia</Label>
-              <Select value={form.watch('bodyType') || undefined} onValueChange={(value) => form.setValue('bodyType', value)}>
-                <SelectTrigger id="vehicle-body" aria-label="Typ nadwozia">
-                  <SelectValue placeholder="Wybierz typ nadwozia" />
-                </SelectTrigger>
-                <SelectContent>
-                  {bodyTypeOptions.map((option) => (
-                    <SelectItem key={option} value={option}>
-                      {option}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="vehicle-fuel">Paliwo</Label>
-              <Input id="vehicle-fuel" placeholder="Diesel" {...form.register('fuelType')} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="vehicle-transmission">Skrzynia</Label>
-              <Select value={form.watch('transmission') || undefined} onValueChange={(value) => form.setValue('transmission', value)}>
-                <SelectTrigger id="vehicle-transmission" aria-label="Skrzynia">
-                  <SelectValue placeholder="Wybierz skrzynię" />
-                </SelectTrigger>
-                <SelectContent>
-                  {transmissionOptions.map((option) => (
-                    <SelectItem key={option} value={option}>
-                      {option}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="vehicle-engine">Silnik</Label>
-              <Input id="vehicle-engine" placeholder="2.0 190 KM" {...form.register('engine')} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="vehicle-power">Moc</Label>
-              <Input
-                id="vehicle-power"
-                type="number"
-                inputMode="numeric"
-                placeholder="190"
-                {...form.register('power', { setValueAs: toOptionalNumber })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="vehicle-color">Kolor</Label>
-              <Input id="vehicle-color" placeholder="Grafitowy" {...form.register('color')} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="vehicle-registration">Rejestracja</Label>
-              <Input id="vehicle-registration" placeholder="KR 1234X" {...form.register('registrationNumber')} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="vehicle-vin">VIN</Label>
-              <Input id="vehicle-vin" placeholder="WBA..." {...form.register('vin')} />
-            </div>
-            <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="vehicle-image">Dodaj zdjęcie z dysku</Label>
-              <div className="rounded-3xl border border-zinc-200 bg-white px-4 py-3">
-                <input
-                  ref={fileInputRef}
-                  id="vehicle-image"
-                  type="file"
-                  accept="image/*"
-                  className="sr-only"
-                  onChange={(event) => void handleImageFileChange(event)}
-                />
-                <div className="flex flex-wrap items-center justify-center gap-3 text-center">
-                  <label
-                    htmlFor="vehicle-image"
-                    className="inline-flex h-9 cursor-pointer items-center justify-center rounded-2xl border border-zinc-200 bg-zinc-50 px-4 text-sm font-medium text-zinc-800 transition hover:border-zinc-300 hover:bg-zinc-100"
-                  >
-                    Wybierz plik
-                  </label>
-                  <p className="text-sm text-zinc-500">
-                    {selectedImageName ? selectedImageName : '(nie wybrano pliku)'}
-                  </p>
-                </div>
-              </div>
-              {imageUploadError ? <p className="text-sm text-red-600">{imageUploadError}</p> : null}
-              {imageUrl ? (
-                <div className="space-y-3 rounded-3xl border border-zinc-200 bg-white p-3">
-                  <img src={imageUrl} alt="Podgląd zdjęcia auta" className="h-40 w-full rounded-2xl object-cover" />
-                  <Button type="button" variant="ghost" onClick={handleRemoveImage}>
-                    Usuń zdjęcie
-                  </Button>
-                </div>
-              ) : null}
-            </div>
-            <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="vehicle-notes">Notatki</Label>
-              <Textarea id="vehicle-notes" placeholder="Krótka notatka o aucie" {...form.register('notes')} />
-            </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="vehicle-body">Typ nadwozia</Label>
+            <Select value={form.watch('bodyType') || undefined} onValueChange={(value) => form.setValue('bodyType', value)}>
+              <SelectTrigger id="vehicle-body" aria-label="Typ nadwozia">
+                <SelectValue placeholder="Wybierz typ nadwozia" />
+              </SelectTrigger>
+              <SelectContent>
+                {bodyTypeOptions.map((option) => (
+                  <SelectItem key={option} value={option}>
+                    {option}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
-        </details>
+          <div className="space-y-2">
+            <Label htmlFor="vehicle-fuel">Paliwo</Label>
+            <Input id="vehicle-fuel" placeholder="Diesel" {...form.register('fuelType')} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="vehicle-transmission">Skrzynia</Label>
+            <Select value={form.watch('transmission') || undefined} onValueChange={(value) => form.setValue('transmission', value)}>
+              <SelectTrigger id="vehicle-transmission" aria-label="Skrzynia">
+                <SelectValue placeholder="Wybierz skrzynię" />
+              </SelectTrigger>
+              <SelectContent>
+                {transmissionOptions.map((option) => (
+                  <SelectItem key={option} value={option}>
+                    {option}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="vehicle-engine">Silnik</Label>
+            <Input id="vehicle-engine" placeholder="2.0 190 KM" {...form.register('engine')} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="vehicle-power">Moc</Label>
+            <Input
+              id="vehicle-power"
+              type="number"
+              inputMode="numeric"
+              placeholder="190"
+              {...form.register('power', { setValueAs: toOptionalNumber })}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="vehicle-color">Kolor</Label>
+            <Input id="vehicle-color" placeholder="Grafitowy" {...form.register('color')} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="vehicle-registration">Rejestracja</Label>
+            <Input id="vehicle-registration" placeholder="KR 1234X" {...form.register('registrationNumber')} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="vehicle-vin">VIN</Label>
+            <Input id="vehicle-vin" placeholder="WBA..." {...form.register('vin')} />
+          </div>
+          <div className="space-y-2 sm:col-span-2">
+            <Label htmlFor="vehicle-image">Dodaj zdjęcie z dysku</Label>
+            <div className="rounded-3xl border border-zinc-200 bg-white px-4 py-3">
+              <input
+                ref={fileInputRef}
+                id="vehicle-image"
+                type="file"
+                accept="image/*"
+                className="sr-only"
+                onChange={(event) => void handleImageFileChange(event)}
+              />
+              <div className="flex flex-wrap items-center justify-center gap-3 text-center">
+                <label
+                  htmlFor="vehicle-image"
+                  className="inline-flex h-9 cursor-pointer items-center justify-center rounded-2xl border border-zinc-200 bg-zinc-50 px-4 text-sm font-medium text-zinc-800 transition hover:border-zinc-300 hover:bg-zinc-100"
+                >
+                  Wybierz plik
+                </label>
+                <p className="text-sm text-zinc-500">
+                  {selectedImageName ? selectedImageName : '(nie wybrano pliku)'}
+                </p>
+              </div>
+            </div>
+            {imageUploadError ? <p className="text-sm text-red-600">{imageUploadError}</p> : null}
+            {imageUrl ? (
+              <div className="space-y-3 rounded-3xl border border-zinc-200 bg-white p-3">
+                <img src={imageUrl} alt="Podgląd zdjęcia auta" className="h-40 w-full rounded-2xl object-cover" />
+                <Button type="button" variant="ghost" onClick={handleRemoveImage}>
+                  Usuń zdjęcie
+                </Button>
+              </div>
+            ) : null}
+          </div>
+          <div className="space-y-2 sm:col-span-2">
+            <Label htmlFor="vehicle-notes">Notatki</Label>
+            <Textarea id="vehicle-notes" placeholder="Krótka notatka o aucie" {...form.register('notes')} />
+          </div>
+        </div>
 
         <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-end">
+          {submitError ? <p className="text-sm text-red-600 sm:mr-auto">{submitError}</p> : null}
           <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
             Anuluj
           </Button>

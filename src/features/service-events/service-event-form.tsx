@@ -17,7 +17,6 @@ import {
 import { Textarea } from '@/shared/components/ui/textarea'
 import { serviceCategoryOptions, serviceCategoryValues } from '@/shared/constants/service-categories'
 import { buildServiceAttachments, normalizeServiceAttachments } from '@/shared/lib/attachments'
-import { formatCurrency } from '@/shared/lib/format'
 import { getTodayIsoDate } from '@/shared/lib/utils'
 import type { ServiceAttachment, ServiceEvent, ServiceEventFormValues } from '@/shared/types/domain'
 
@@ -177,6 +176,7 @@ export function ServiceEventForm({
   const [attachments, setAttachments] = useState<ServiceAttachment[]>([])
   const [pendingAttachmentFiles, setPendingAttachmentFiles] = useState<File[]>([])
   const [attachmentError, setAttachmentError] = useState<string | null>(null)
+  const [submitError, setSubmitError] = useState<string | null>(null)
   const form = useForm<ServiceEventValues>({
     resolver: zodResolver(serviceEventSchema),
     defaultValues: { ...emptyValues, status: defaultStatus },
@@ -185,6 +185,10 @@ export function ServiceEventForm({
   const isRecurring = form.watch('isRecurring') ?? false
   const recurrenceType = form.watch('recurrenceType') ?? 'time'
   const totalCost = (form.watch('laborCost') ?? 0) + (form.watch('partsCost') ?? 0) + (form.watch('otherCost') ?? 0)
+  const totalCostDisplay = new Intl.NumberFormat('pl-PL', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(totalCost)
   const attachmentCount = form.watch('attachmentCount') ?? 0
 
   useEffect(() => {
@@ -195,6 +199,7 @@ export function ServiceEventForm({
     setAttachments(normalizeServiceAttachments(initialValues ?? {}))
     setPendingAttachmentFiles([])
     setAttachmentError(null)
+    setSubmitError(null)
     form.reset(
       initialValues
         ? toServiceEventFormDefaults(initialValues)
@@ -207,20 +212,26 @@ export function ServiceEventForm({
   }, [defaultStatus, form, initialValues, open])
 
   async function handleSubmit(values: ServiceEventValues) {
-    const serializedAttachments = pendingAttachmentFiles.length > 0 ? await buildServiceAttachments(pendingAttachmentFiles) : attachments
+    setSubmitError(null)
 
-    await onSubmit({
-      ...values,
-      isRecurring: values.status === 'planned' ? values.isRecurring : false,
-      recurrenceType: values.status === 'planned' && values.isRecurring ? values.recurrenceType : undefined,
-      recurrenceIntervalValue: values.status === 'planned' && values.isRecurring && values.recurrenceType === 'time' ? values.recurrenceIntervalValue : undefined,
-      recurrenceIntervalUnit: values.status === 'planned' && values.isRecurring && values.recurrenceType === 'time' ? values.recurrenceIntervalUnit : undefined,
-      recurrenceMileageInterval: values.status === 'planned' && values.isRecurring && values.recurrenceType === 'mileage' ? values.recurrenceMileageInterval : undefined,
-      attachmentCount: serializedAttachments.length,
-      attachmentNames: serializedAttachments.length > 0 ? serializedAttachments.map((attachment) => attachment.name) : undefined,
-      attachments: serializedAttachments.length > 0 ? serializedAttachments : undefined,
-    })
-    onOpenChange(false)
+    try {
+      const serializedAttachments = pendingAttachmentFiles.length > 0 ? await buildServiceAttachments(pendingAttachmentFiles) : attachments
+
+      await onSubmit({
+        ...values,
+        isRecurring: values.status === 'planned' ? values.isRecurring : false,
+        recurrenceType: values.status === 'planned' && values.isRecurring ? values.recurrenceType : undefined,
+        recurrenceIntervalValue: values.status === 'planned' && values.isRecurring && values.recurrenceType === 'time' ? values.recurrenceIntervalValue : undefined,
+        recurrenceIntervalUnit: values.status === 'planned' && values.isRecurring && values.recurrenceType === 'time' ? values.recurrenceIntervalUnit : undefined,
+        recurrenceMileageInterval: values.status === 'planned' && values.isRecurring && values.recurrenceType === 'mileage' ? values.recurrenceMileageInterval : undefined,
+        attachmentCount: serializedAttachments.length,
+        attachmentNames: serializedAttachments.length > 0 ? serializedAttachments.map((attachment) => attachment.name) : undefined,
+        attachments: serializedAttachments.length > 0 ? serializedAttachments : undefined,
+      })
+      onOpenChange(false)
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : 'Nie udało się zapisać wpisu serwisowego')
+    }
   }
 
   function handleRecurringChange(nextValue: boolean) {
@@ -287,9 +298,13 @@ export function ServiceEventForm({
       open={open}
       onOpenChange={onOpenChange}
       title={initialValues ? 'Edytuj wpis' : valuesTitle(defaultStatus)}
-      description="Wszystkie pola są dostępne od razu w jednym widoku."
     >
-      <form className="space-y-4" onSubmit={form.handleSubmit(handleSubmit)}>
+      <form className="relative space-y-4 pt-14 sm:pt-16" onSubmit={form.handleSubmit(handleSubmit)}>
+        <div className="pointer-events-none absolute right-0 top-0 select-none text-right text-zinc-400" aria-hidden="true">
+          <span className="text-4xl font-semibold leading-none sm:text-6xl">{totalCostDisplay}</span>
+          <span className="ml-2 text-3xl font-medium uppercase tracking-wide sm:text-4xl">PLN</span>
+        </div>
+
         <div className="space-y-2">
           <Label htmlFor="service-title">Tytuł</Label>
           <Input id="service-title" placeholder="np. Wymiana oleju" {...form.register('title')} />
@@ -312,7 +327,7 @@ export function ServiceEventForm({
           </Select>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="service-date">Data</Label>
             <Input id="service-date" type="date" {...form.register('eventDate')} />
@@ -325,15 +340,6 @@ export function ServiceEventForm({
               inputMode="numeric"
               placeholder="128450"
               {...form.register('mileage', { setValueAs: toOptionalNumber })}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="service-total-cost">Wartość</Label>
-            <Input
-              id="service-total-cost"
-              type="text"
-              readOnly
-              value={formatCurrency(totalCost)}
             />
           </div>
         </div>
@@ -434,11 +440,7 @@ export function ServiceEventForm({
           </div>
         ) : null}
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-2 sm:col-span-2">
-            <Label htmlFor="service-workshop">Warsztat</Label>
-            <Input id="service-workshop" placeholder="Nazwa warsztatu" {...form.register('workshopName')} />
-          </div>
+        <div className="grid gap-4 sm:grid-cols-3">
           <div className="space-y-2">
             <Label htmlFor="service-labor">Koszty usługi</Label>
             <Input
@@ -459,7 +461,7 @@ export function ServiceEventForm({
               {...form.register('partsCost', { setValueAs: toOptionalNumber })}
             />
           </div>
-          <div className="space-y-2 sm:col-span-2">
+          <div className="space-y-2">
             <Label htmlFor="service-other">Inne koszty</Label>
             <Input
               id="service-other"
@@ -469,11 +471,15 @@ export function ServiceEventForm({
               {...form.register('otherCost', { setValueAs: toOptionalNumber })}
             />
           </div>
-          <div className="space-y-2 sm:col-span-2">
+          <div className="space-y-2 sm:col-span-3">
+            <Label htmlFor="service-workshop">Warsztat</Label>
+            <Input id="service-workshop" placeholder="Nazwa warsztatu" {...form.register('workshopName')} />
+          </div>
+          <div className="space-y-2 sm:col-span-3">
             <Label htmlFor="service-description">Opis</Label>
             <Textarea id="service-description" placeholder="Krótki opis, części, zakres prac" {...form.register('description')} />
           </div>
-          <div className="space-y-2 sm:col-span-2">
+          <div className="space-y-2 sm:col-span-3">
             <Label htmlFor="service-attachments">Załączniki</Label>
             <div className="rounded-3xl border border-zinc-200 bg-white px-4 py-3">
               <input
@@ -514,6 +520,7 @@ export function ServiceEventForm({
         </div>
 
         <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-end">
+          {submitError ? <p className="text-sm text-red-600 sm:mr-auto">{submitError}</p> : null}
           <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
             Anuluj
           </Button>

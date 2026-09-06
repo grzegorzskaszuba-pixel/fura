@@ -1,0 +1,84 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+    inputs:
+      run_e2e:
+        description: Force E2E execution
+        required: false
+        default: 'false'
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      app_changed: ${{ steps.filter.outputs.app_changed }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Detect changed paths
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            app_changed:
+              - 'src/**'
+              - 'server/**'
+              - 'scripts/**'
+              - 'tests/**'
+              - 'playwright.config.ts'
+              - 'vite.config.ts'
+              - 'package.json'
+              - 'package-lock.json'
+              - 'tsconfig*.json'
+
+  verify:
+    needs: changes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Run full Vitest suite
+        run: npm run test
+
+  e2e:
+    needs: [changes, verify]
+    runs-on: ubuntu-latest
+    if: ${{ needs.changes.outputs.app_changed == 'true' || (github.event_name == 'workflow_dispatch' && github.event.inputs.run_e2e == 'true') }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run E2E tests
+        run: npm run test:e2e
