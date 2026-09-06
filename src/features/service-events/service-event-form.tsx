@@ -206,6 +206,7 @@ export function ServiceEventForm({
   onSubmit,
 }: ServiceEventFormProps) {
   const attachmentInputRef = useRef<HTMLInputElement | null>(null)
+  const cameraAttachmentInputRef = useRef<HTMLInputElement | null>(null)
   const [attachments, setAttachments] = useState<ServiceAttachment[]>([])
   const [pendingAttachmentFiles, setPendingAttachmentFiles] = useState<File[]>([])
   const [attachmentError, setAttachmentError] = useState<string | null>(null)
@@ -298,6 +299,10 @@ export function ServiceEventForm({
 
     if (attachmentInputRef.current) {
       attachmentInputRef.current.value = ''
+    }
+
+    if (cameraAttachmentInputRef.current) {
+      cameraAttachmentInputRef.current.value = ''
     }
   }
 
@@ -525,12 +530,27 @@ export function ServiceEventForm({
                 className="sr-only"
                 onChange={handleAttachmentChange}
               />
+              <input
+                ref={cameraAttachmentInputRef}
+                id="service-attachments-camera"
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="sr-only"
+                onChange={handleAttachmentChange}
+              />
               <div className="flex flex-wrap items-center justify-center gap-3 text-center">
                 <label
                   htmlFor="service-attachments"
                   className="inline-flex h-9 cursor-pointer items-center justify-center rounded-2xl border border-zinc-200 bg-zinc-50 px-4 text-sm font-medium text-zinc-800 transition hover:border-zinc-300 hover:bg-zinc-100"
                 >
                   Wybierz pliki
+                </label>
+                <label
+                  htmlFor="service-attachments-camera"
+                  className="inline-flex h-9 cursor-pointer items-center justify-center rounded-2xl border border-zinc-200 bg-zinc-50 px-4 text-sm font-medium text-zinc-800 transition hover:border-zinc-300 hover:bg-zinc-100 sm:hidden"
+                >
+                  Zrób zdjęcie
                 </label>
                 <p className="text-sm text-zinc-500">{formatAttachmentSummary(attachments.map((attachment) => attachment.name), attachmentCount)}</p>
               </div>

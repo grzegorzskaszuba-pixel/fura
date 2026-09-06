@@ -404,20 +404,20 @@ export default function App() {
               </DropdownMenu>
             ) : null}
           </div>
-          <div className="relative inline-flex h-[60px] w-[120px] items-center justify-center sm:h-[72px] sm:w-[144px]" aria-label="Branding FURA">
+          <div className="brand-switch relative inline-flex h-[60px] w-[120px] items-center justify-center sm:h-[72px] sm:w-[144px]" aria-label="Branding FURA">
             <img
               src={furaLogo}
               alt="Logo FURA"
               className={cn(
-                'absolute right-0 h-[60px] w-auto object-contain transition-opacity duration-700 ease-in-out sm:h-[72px]',
-                showLogoText ? 'opacity-0' : 'opacity-100',
+                'brand-face h-[60px] w-auto object-contain sm:h-[72px]',
+                showLogoText ? 'app-logo-hidden' : 'app-logo-visible',
               )}
             />
             <span
               aria-hidden="true"
               className={cn(
-                'absolute right-0 text-[40px] font-semibold leading-none tracking-[-0.08em] text-zinc-950 transition-opacity duration-700 ease-in-out',
-                showLogoText ? 'opacity-100' : 'opacity-0',
+                'brand-face app-logo-text text-[40px] font-semibold leading-none tracking-[-0.08em] text-zinc-950',
+                showLogoText ? 'app-logo-visible app-logo-text-shine-trigger' : 'app-logo-hidden',
               )}
             >
               FURA
