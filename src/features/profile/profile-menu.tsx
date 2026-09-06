@@ -33,7 +33,7 @@ export function ProfileMenu({ currentProfile, onOpenProfile, onLogout }: Profile
         <DropdownMenuItem onSelect={onOpenProfile}>
           <div>
             <div className="font-medium text-zinc-900">{currentProfile.displayName ?? currentProfile.username}</div>
-            <div className="text-xs text-zinc-500">@{currentProfile.username}</div>
+            <div className="text-xs text-zinc-500">{currentProfile.username}</div>
           </div>
         </DropdownMenuItem>
         <DropdownMenuItem onSelect={onLogout}>
