@@ -132,12 +132,34 @@ const emptyValues: ServiceEventValues = {
   recurrenceMileageInterval: undefined,
 }
 
-function toOptionalNumber(value: string) {
-  return value === '' ? undefined : Number(value)
+function toOptionalNumber(value: unknown) {
+  if (value === null || value === undefined) {
+    return undefined
+  }
+
+  if (typeof value === 'number') {
+    return Number.isNaN(value) ? undefined : value
+  }
+
+  const normalized = String(value).trim()
+  if (normalized === '') {
+    return undefined
+  }
+
+  const parsed = Number(normalized)
+  return Number.isNaN(parsed) ? undefined : parsed
 }
 
-function toOptionalDecimal(value: string) {
-  const normalized = value.trim().replace(',', '.')
+function toOptionalDecimal(value: unknown) {
+  if (value === null || value === undefined) {
+    return undefined
+  }
+
+  if (typeof value === 'number') {
+    return Number.isNaN(value) ? undefined : value
+  }
+
+  const normalized = String(value).trim().replace(',', '.')
 
   if (normalized === '') {
     return undefined
