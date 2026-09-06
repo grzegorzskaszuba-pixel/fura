@@ -184,6 +184,66 @@ describe('Auth security regression', () => {
     expect(response.status).toBe(404)
   })
 
+  it('logs out profile from all active sessions', async () => {
+    const stamp = Date.now()
+    const username = `logout_all_${stamp}`
+
+    const register = await apiRequest('/api/auth/register', {
+      method: 'POST',
+      body: {
+        username,
+        displayName: 'Logout All',
+        password: 'logout-pass-1',
+      },
+    })
+    const firstSessionCookie = register.headers.get('set-cookie')?.split(';', 1)[0] ?? ''
+
+    expect(register.status).toBe(200)
+    expect(firstSessionCookie).toBeTruthy()
+
+    const loginSecondSession = await apiRequest('/api/auth/login', {
+      method: 'POST',
+      body: {
+        username,
+        password: 'logout-pass-1',
+      },
+    })
+    const secondSessionCookie = loginSecondSession.headers.get('set-cookie')?.split(';', 1)[0] ?? ''
+
+    expect(loginSecondSession.status).toBe(200)
+    expect(secondSessionCookie).toBeTruthy()
+    expect(secondSessionCookie).not.toBe(firstSessionCookie)
+
+    const sessionBeforeLogout = await apiRequest('/api/auth/session', {
+      cookie: secondSessionCookie,
+    })
+    const beforePayload = (await sessionBeforeLogout.json()) as { profileId: string | null }
+
+    expect(sessionBeforeLogout.status).toBe(200)
+    expect(beforePayload.profileId).toBeTruthy()
+
+    const logoutFromFirstSession = await apiRequest('/api/auth/logout', {
+      method: 'POST',
+      cookie: firstSessionCookie,
+    })
+
+    expect(logoutFromFirstSession.status).toBe(200)
+
+    const sessionAfterLogout = await apiRequest('/api/auth/session', {
+      cookie: secondSessionCookie,
+    })
+    const afterPayload = (await sessionAfterLogout.json()) as { profileId: string | null }
+
+    expect(sessionAfterLogout.status).toBe(200)
+    expect(afterPayload.profileId).toBeNull()
+
+    const protectedRequestAfterLogout = await apiRequest('/api/vehicles', {
+      cookie: secondSessionCookie,
+    })
+
+    expect(protectedRequestAfterLogout.status).toBe(401)
+  })
+
   it('rejects updating vehicle from another profile session', async () => {
     const stamp = Date.now()
     const userA = `vehicle_owner_${stamp}`

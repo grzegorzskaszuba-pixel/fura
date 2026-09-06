@@ -323,6 +323,28 @@ export default function App() {
     setDetailEventId(null)
   }
 
+  async function handleLogout() {
+    setAppError(null)
+
+    // Optimistic local logout so UI switches to auth screen immediately.
+    setCurrentProfileId(null)
+    setCurrentProfile(null)
+    setVehicles([])
+    setServiceEvents([])
+    setPersistedActiveVehicleId(null)
+    setActiveVehicleId(null)
+    setEditingVehicleId(null)
+    setEditingEventId(null)
+    setDetailEventId(null)
+    setProfileSettingsOpen(false)
+
+    try {
+      await authService.logout()
+    } catch (error) {
+      setAppError(error instanceof Error ? error.message : 'Wylogowano lokalnie, ale nie udało się zamknąć wszystkich sesji na serwerze.')
+    }
+  }
+
   return (
     <main className="mx-auto min-h-svh w-full max-w-6xl px-4 pb-32 pt-4 sm:px-6 sm:pt-6 lg:px-8">
       <div className="space-y-4 sm:space-y-5">
@@ -337,7 +359,7 @@ export default function App() {
             <ProfileMenu
               currentProfile={currentProfile}
               onOpenProfile={() => setProfileSettingsOpen(true)}
-              onLogout={() => void authService.logout()}
+              onLogout={() => void handleLogout()}
             />
             {activeVehicle ? (
               <DropdownMenu>

@@ -68,11 +68,21 @@ export class RemoteAuthService implements AuthService {
   }
 
   async logout() {
-    await httpRequest<void>(`${this.baseUrl}/logout`, {
-      method: 'POST',
-    })
+    let requestError: unknown = null
+
+    try {
+      await httpRequest<void>(`${this.baseUrl}/logout`, {
+        method: 'POST',
+      })
+    } catch (error) {
+      requestError = error
+    }
 
     clearSessionToken()
     await appStateRepository.setCurrentProfileId(null)
+
+    if (requestError) {
+      throw requestError
+    }
   }
 }

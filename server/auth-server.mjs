@@ -115,6 +115,14 @@ function createSession(profileId) {
   return sessionId
 }
 
+function invalidateProfileSessions(profileId) {
+  for (const [sessionId, activeProfileId] of sessions.entries()) {
+    if (activeProfileId === profileId) {
+      sessions.delete(sessionId)
+    }
+  }
+}
+
 function readBearerSessionId(request) {
   const authHeader = request.headers.authorization
 
@@ -280,8 +288,11 @@ async function handleAuthRequest(request, response) {
 
   if (pathname === '/api/auth/logout' && method === 'POST') {
     const sessionId = getRequestSessionId(request)
+    const profileId = getSessionProfileId(sessions, sessionId)
 
-    if (sessionId) {
+    if (profileId) {
+      invalidateProfileSessions(profileId)
+    } else if (sessionId) {
       sessions.delete(sessionId)
     }
 
