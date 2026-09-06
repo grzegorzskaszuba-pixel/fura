@@ -3,7 +3,8 @@ import type { ServiceEvent, Vehicle } from '@/shared/types/domain'
 const currencyFormatter = new Intl.NumberFormat('pl-PL', {
   style: 'currency',
   currency: 'PLN',
-  maximumFractionDigits: 0,
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
 })
 
 const mileageFormatter = new Intl.NumberFormat('pl-PL')
