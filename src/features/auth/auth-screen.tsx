@@ -64,40 +64,18 @@ export function AuthScreen({ onLogin, onRegister, onResetPassword, allowResetPas
   }
 
   return (
-    <main className="mx-auto flex min-h-svh w-full max-w-6xl items-center px-4 py-6 sm:px-6 lg:px-8">
-      <Card className="w-full overflow-hidden bg-white/92">
-        <div className="grid gap-0 lg:grid-cols-[1.05fr_0.95fr]">
-          <div className="flex flex-col justify-between gap-10 bg-zinc-950 px-6 py-8 text-white sm:px-8 lg:px-10 lg:py-12">
-            <div className="space-y-5">
-              <div className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-3 py-2">
-                <span className="text-3xl font-semibold tracking-[-0.08em] text-white sm:text-5xl">FURA</span>
+    <main className="mx-auto flex min-h-svh w-full max-w-xl items-center px-4 py-6 sm:px-6">
+      <Card className="w-full bg-white/92">
+        <CardContent className="p-6 sm:p-8 lg:p-10">
+          <div className="mx-auto max-w-md space-y-6">
+            <div className="space-y-3">
+              <div className="inline-flex items-center rounded-full border border-zinc-200 bg-zinc-100 px-3 py-2">
+                <span className="text-3xl font-semibold tracking-[-0.08em] text-zinc-950 sm:text-5xl">FURA</span>
               </div>
-              <div className="space-y-4">
-                <h1 className="max-w-md text-4xl font-semibold leading-tight tracking-[-0.04em] text-white sm:text-5xl">
-                  Prosty dziennik serwisowy dla każdego auta.
-                </h1>
-                <p className="max-w-md text-sm leading-7 text-zinc-300 sm:text-base">
-                  Mobile-first, lokalny vertical slice i separacja danych per profil od pierwszego dnia.
-                </p>
-              </div>
+              <p className="text-sm leading-6 text-zinc-500 sm:text-base">Prosty dziennik serwisowy dla każdego auta.</p>
+              <p className="text-sm leading-6 text-zinc-500">Zaloguj się lub utwórz profil.</p>
+              {startupError ? <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">{startupError}</p> : null}
             </div>
-            <div className="grid gap-3 text-sm text-zinc-300 sm:grid-cols-3">
-              <div className="rounded-3xl border border-white/10 bg-white/5 p-4">Karuzela aut i jeden ekran roboczy.</div>
-              <div className="rounded-3xl border border-white/10 bg-white/5 p-4">Historia i plan w jednym przełączniku.</div>
-              <div className="rounded-3xl border border-white/10 bg-white/5 p-4">Twoje dane i profile zapisane lokalnie w IndexedDB.</div>
-            </div>
-          </div>
-
-          <CardContent className="p-6 sm:p-8 lg:p-10">
-            <div className="mx-auto max-w-md space-y-6">
-              <div className="space-y-2">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-400">Start</p>
-                <h2 className="text-3xl font-semibold tracking-[-0.04em] text-zinc-950">Mój profil</h2>
-                <p className="text-sm leading-6 text-zinc-500">
-                  Zaloguj się lub utwórz profil. Każdy profil ma oddzielną przestrzeń danych.
-                </p>
-                {startupError ? <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">{startupError}</p> : null}
-              </div>
 
               <div className={`grid rounded-2xl bg-zinc-100 p-1 ${allowResetPassword ? 'grid-cols-3' : 'grid-cols-2'}`}>
                 <button
@@ -159,12 +137,8 @@ export function AuthScreen({ onLogin, onRegister, onResetPassword, allowResetPas
                 </div>
               </form>
 
-              <div className="rounded-3xl border border-zinc-200 bg-zinc-50 p-4 text-sm leading-6 text-zinc-600">
-                Konto jest wspólne między urządzeniami w tej samej sieci, gdy aplikacja działa przez lokalny backend.
-              </div>
-            </div>
-          </CardContent>
-        </div>
+          </div>
+        </CardContent>
       </Card>
     </main>
   )
