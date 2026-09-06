@@ -16,12 +16,39 @@ const emptyState = {
 }
 
 const storageMode = String(process.env.AUTH_STORAGE ?? '').trim().toLowerCase()
-const postgresUrl = String(process.env.AUTH_DATABASE_URL ?? process.env.DATABASE_URL ?? '').trim()
+const postgresUrl = String(
+  process.env.AUTH_DATABASE_URL ??
+    process.env.DATABASE_URL ??
+    process.env.INTERNAL_DATABASE_URL ??
+    '',
+).trim()
+const authDatabaseSsl = String(process.env.AUTH_DATABASE_SSL ?? '').trim().toLowerCase()
 const usePostgres = storageMode === 'postgres' || (storageMode.length === 0 && postgresUrl.length > 0)
+
+function resolvePostgresSsl() {
+  if (!usePostgres) {
+    return undefined
+  }
+
+  if (authDatabaseSsl === 'disable' || authDatabaseSsl === 'off' || authDatabaseSsl === 'false') {
+    return undefined
+  }
+
+  if (authDatabaseSsl === 'require' || authDatabaseSsl === 'on' || authDatabaseSsl === 'true') {
+    return { rejectUnauthorized: false }
+  }
+
+  if (postgresUrl.includes('render.com') || process.env.RENDER === 'true') {
+    return { rejectUnauthorized: false }
+  }
+
+  return undefined
+}
 
 const pgPool = usePostgres
   ? new Pool({
       connectionString: postgresUrl,
+      ssl: resolvePostgresSsl(),
     })
   : null
 
@@ -55,6 +82,10 @@ function normalizeState(candidate) {
 async function ensurePostgresStorage() {
   if (!pgPool) {
     throw new Error('Postgres storage is not initialized')
+  }
+
+  if (!postgresUrl) {
+    throw new Error('Brak konfiguracji bazy PostgreSQL: ustaw DATABASE_URL lub AUTH_DATABASE_URL')
   }
 
   if (pgInitialized) {
