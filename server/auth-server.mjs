@@ -11,7 +11,7 @@ import {
 } from './auth-core.mjs'
 import { readState, writeState } from './storage.mjs'
 
-const PORT = Number(process.env.AUTH_API_PORT ?? 8787)
+const PORT = Number(process.env.AUTH_API_PORT ?? process.env.PORT ?? 8787)
 const HOST = process.env.AUTH_API_HOST ?? '0.0.0.0'
 const SESSION_COOKIE = 'fura_session'
 const ALLOWED_ORIGINS = String(process.env.AUTH_API_ALLOWED_ORIGINS ?? '*')

@@ -1,0 +1,40 @@
+services:
+  - type: web
+    name: fura-api
+    runtime: node
+    plan: free
+    rootDir: .
+    buildCommand: npm ci
+    startCommand: npm run api
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: AUTH_API_HOST
+        value: 0.0.0.0
+      - key: AUTH_DB_FILE
+        value: /var/data/auth-db.json
+      # Update this after first deploy if your frontend URL differs.
+      - key: AUTH_API_ALLOWED_ORIGINS
+        value: https://fura-web.onrender.com
+    disk:
+      name: auth-data
+      mountPath: /var/data
+      sizeGB: 1
+
+  - type: web
+    name: fura-web
+    runtime: static
+    rootDir: .
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      # Update if your API hostname differs.
+      - key: VITE_API_BASE_URL
+        value: https://fura-api.onrender.com/api
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
