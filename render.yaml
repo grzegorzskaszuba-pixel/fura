@@ -13,14 +13,10 @@ services:
       - key: AUTH_API_HOST
         value: 0.0.0.0
       - key: AUTH_DB_FILE
-        value: /var/data/auth-db.json
+        value: /tmp/auth-db.json
       # Update this after first deploy if your frontend URL differs.
       - key: AUTH_API_ALLOWED_ORIGINS
         value: https://fura-web.onrender.com
-    disk:
-      name: auth-data
-      mountPath: /var/data
-      sizeGB: 1
 
   - type: web
     name: fura-web
