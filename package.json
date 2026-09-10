@@ -4,8 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "node scripts/dev-stack.mjs",
+    "dev": "node scripts/dev-watchdog.mjs",
     "dev:stack": "node scripts/dev-stack.mjs",
+    "dev:watchdog": "node scripts/dev-watchdog.mjs",
     "dev:local": "node scripts/dev-stack.mjs",
     "dev:remote": "node scripts/dev-stack.mjs",
     "api": "node server/auth-server.mjs",

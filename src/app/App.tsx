@@ -1,4 +1,4 @@
-import { CarFront, ChevronDown, Pencil, Plus, Wrench } from 'lucide-react'
+import { CarFront, ChevronDown, Pencil, Plus, Trash2, Wrench } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 
 import { appStateRepository } from '@/data/repositories/app-state-repository'
@@ -16,6 +16,7 @@ import { ServiceSummary } from '@/features/service-events/service-summary'
 import { VehicleCarousel } from '@/features/vehicles/vehicle-carousel'
 import { VehicleForm } from '@/features/vehicles/vehicle-form'
 import { EmptyState } from '@/shared/components/empty-state'
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/shared/components/ui/alert-dialog'
 import { Button } from '@/shared/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/shared/components/ui/dropdown-menu'
 import { getDefaultVehicleImage } from '@/shared/constants/vehicle-images'
@@ -44,6 +45,7 @@ export default function App() {
   const [isBootstrapping, setIsBootstrapping] = useState(true)
   const [appError, setAppError] = useState<string | null>(null)
   const [showLogoText, setShowLogoText] = useState(false)
+  const [deleteVehicleDialogOpen, setDeleteVehicleDialogOpen] = useState(false)
 
   const activeVehicle = useMemo(() => vehicles.find((vehicle) => vehicle.id === activeVehicleId) ?? vehicles[0] ?? null, [activeVehicleId, vehicles])
   const editingVehicle = useMemo(() => vehicles.find((vehicle) => vehicle.id === editingVehicleId) ?? null, [editingVehicleId, vehicles])
@@ -233,6 +235,25 @@ export default function App() {
     await reloadVehicles(currentProfileId)
   }
 
+  async function handleDeleteVehicle(vehicleId: string) {
+    if (!currentProfileId) {
+      return
+    }
+
+    await vehicleRepository.remove(vehicleId)
+    const profileVehicles = await vehicleRepository.listByProfile(currentProfileId)
+    setVehicles(profileVehicles)
+
+    const nextVehicleId = profileVehicles[0]?.id ?? null
+    setPersistedActiveVehicleId(nextVehicleId)
+    setActiveVehicleId(nextVehicleId)
+    setServiceEvents([])
+    setEditingVehicleId(null)
+    setDetailEventId(null)
+
+    await appStateRepository.setCurrentVehicleId(currentProfileId, nextVehicleId)
+  }
+
   async function handleServiceEventSave(values: ServiceEventFormValues) {
     if (!currentProfileId || !activeVehicle) {
       return
@@ -400,6 +421,11 @@ export default function App() {
                     <Plus className="mr-2 h-4 w-4" />
                     Dodaj nowe
                   </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem className="text-red-600 focus:bg-red-50 focus:text-red-700" onSelect={() => setDeleteVehicleDialogOpen(true)}>
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Usuń wybrane
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : null}
@@ -555,6 +581,41 @@ export default function App() {
           await authService.changePassword(currentProfile.id, values)
         }}
       />
+
+      <AlertDialog open={deleteVehicleDialogOpen} onOpenChange={setDeleteVehicleDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Usunąć wybrane auto?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {activeVehicle?.name
+                ? `Czy na pewno chcesz usunąć auto "${activeVehicle.name}"? Tej operacji nie da się cofnąć. Razem z autem stracisz całą historię serwisową.`
+                : 'Czy na pewno chcesz usunąć wybrane auto? Tej operacji nie da się cofnąć. Razem z autem stracisz całą historię serwisową.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel asChild>
+              <Button type="button" variant="ghost">
+                Anuluj
+              </Button>
+            </AlertDialogCancel>
+            <AlertDialogAction
+              asChild
+              onClick={async () => {
+                if (!activeVehicle) {
+                  return
+                }
+
+                await handleDeleteVehicle(activeVehicle.id)
+                setDeleteVehicleDialogOpen(false)
+              }}
+            >
+              <Button type="button" variant="destructive">
+                Usuń auto
+              </Button>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <button
         type="button"

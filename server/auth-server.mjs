@@ -429,6 +429,30 @@ async function handleAuthRequest(request, response) {
     return
   }
 
+  if (pathname.startsWith('/api/vehicles/') && method === 'DELETE') {
+    const profileId = getAuthenticatedProfileId(request)
+
+    if (!profileId) {
+      setJson(response, 401, { message: 'Brak aktywnej sesji' })
+      return
+    }
+
+    const state = await readState()
+    const vehicleId = pathname.slice('/api/vehicles/'.length)
+    const existing = state.vehicles.find((entry) => entry.id === vehicleId)
+
+    if (!existing || existing.profileId !== profileId) {
+      setJson(response, 404, { message: 'Vehicle not found' })
+      return
+    }
+
+    state.vehicles = state.vehicles.filter((entry) => entry.id !== vehicleId)
+    state.serviceEvents = state.serviceEvents.filter((entry) => entry.vehicleId !== vehicleId)
+    await writeState(state)
+    setJson(response, 200, { ok: true })
+    return
+  }
+
   if (pathname === '/api/service-events' && method === 'GET') {
     const profileId = getAuthenticatedProfileId(request)
 

@@ -107,4 +107,30 @@ export const vehicleRepository = {
 
     return response.vehicle
   },
+
+  async remove(vehicleId: string) {
+    if (!isRemoteMode()) {
+      await db.transaction('rw', db.vehicles, db.serviceEvents, async () => {
+        const existing = await db.vehicles.get(vehicleId)
+
+        if (!existing) {
+          throw new Error('Pojazd nie istnieje')
+        }
+
+        const relatedEventIds = await db.serviceEvents.where('vehicleId').equals(vehicleId).primaryKeys()
+
+        if (relatedEventIds.length > 0) {
+          await db.serviceEvents.bulkDelete(relatedEventIds)
+        }
+
+        await db.vehicles.delete(vehicleId)
+      })
+
+      return
+    }
+
+    await httpRequest<void>(`${vehiclesBaseUrl}/${vehicleId}`, {
+      method: 'DELETE',
+    })
+  },
 }

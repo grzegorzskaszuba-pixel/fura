@@ -262,4 +262,50 @@ describe('data API integration', () => {
     expect(listAsA.response.status).toBe(200)
     expect(payloadA.events.map((event) => event.id)).toContain(eventA.event.id)
   })
+
+  it('deletes own vehicle and removes related service events', async () => {
+    const stamp = Date.now()
+    const cookie = await registerAndGetCookie(`vehicle_delete_${stamp}`)
+
+    const createVehicle = await apiRequest('/api/vehicles', {
+      method: 'POST',
+      cookie,
+      body: {
+        name: 'Honda Civic',
+        make: 'Honda',
+        model: 'Civic',
+      },
+    })
+
+    expect(createVehicle.response.status).toBe(200)
+    const vehicle = (await createVehicle.response.json()) as { vehicle: { id: string } }
+
+    const createEvent = await apiRequest('/api/service-events', {
+      method: 'POST',
+      cookie,
+      body: {
+        vehicleId: vehicle.vehicle.id,
+        status: 'completed',
+        category: 'repair',
+        title: 'Wymiana oleju',
+      },
+    })
+
+    expect(createEvent.response.status).toBe(200)
+
+    const deleteVehicle = await apiRequest(`/api/vehicles/${vehicle.vehicle.id}`, {
+      method: 'DELETE',
+      cookie,
+    })
+
+    expect(deleteVehicle.response.status).toBe(200)
+
+    const listVehicles = await apiRequest('/api/vehicles', { cookie })
+    const vehiclesPayload = (await listVehicles.response.json()) as { vehicles: Array<{ id: string }> }
+    expect(listVehicles.response.status).toBe(200)
+    expect(vehiclesPayload.vehicles.map((entry) => entry.id)).not.toContain(vehicle.vehicle.id)
+
+    const listEvents = await apiRequest(`/api/service-events?vehicleId=${vehicle.vehicle.id}`, { cookie })
+    expect(listEvents.response.status).toBe(404)
+  })
 })

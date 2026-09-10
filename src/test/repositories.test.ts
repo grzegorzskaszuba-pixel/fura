@@ -142,4 +142,29 @@ describe('Repositories', () => {
     expect(saved?.recurrenceIntervalValue).toBe(6)
     expect(saved?.recurrenceIntervalUnit).toBe('months')
   })
+
+  it('removes vehicle together with its service history', async () => {
+    const profile = await profileRepository.create({ username: 'repo-delete-vehicle', displayName: 'Repo Delete Vehicle' })
+    const vehicle = await vehicleRepository.create(profile.id, {
+      name: 'Opel Astra',
+      make: 'Opel',
+      model: 'Astra',
+    })
+
+    await serviceEventRepository.create(profile.id, vehicle.id, {
+      status: 'completed',
+      category: 'repair',
+      title: 'Wymiana klockow hamulcowych',
+    })
+
+    await vehicleRepository.remove(vehicle.id)
+
+    const [savedVehicle, events] = await Promise.all([
+      vehicleRepository.getById(vehicle.id),
+      serviceEventRepository.listByVehicle(profile.id, vehicle.id),
+    ])
+
+    expect(savedVehicle).toBeNull()
+    expect(events).toHaveLength(0)
+  })
 })
