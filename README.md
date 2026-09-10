@@ -41,8 +41,8 @@ npm install
 npm run dev
 ```
 
-`npm run dev` uruchamia watchdog, który nadzoruje cały stack i automatycznie restartuje go po awarii lub utracie healthchecka.
-Watchdog działa w trybie single-instance: kolejne wywołania `npm run dev` wykrywają aktywną instancję i nie ubijają działającego serwera.
+`npm run dev` uruchamia stabilny launcher stacka (API + web) w trybie single-instance.
+Kolejne wywołania `npm run dev` wykrywają aktywną instancję i nie ubijają działającego serwera.
 
 Jedyny poprawny flow developerski to uruchamianie całego stacka:
 
@@ -53,11 +53,11 @@ Komenda uruchamia stabilny lokalny stack (API + frontend) na stałych portach:
 - Web: `http://localhost:5173`
 - API: `http://localhost:8787`
 
-Skrypt startup automatycznie czyści konflikty portów, nadzoruje procesy i wznawia je po awarii, więc nie trzeba ręcznie restartować aplikacji.
+Skrypt startup nadzoruje procesy API/web i wznawia je po awarii, bez agresywnego ubijania procesów po porcie przy każdym starcie.
 
 Tryb trwały w VS Code:
 
-- po otwarciu workspace VS Code automatycznie uruchamia task `Carlog: Dev Watchdog`
+- po otwarciu workspace VS Code automatycznie uruchamia task `Carlog: Dev Stack`
 - task działa do zamknięcia VS Code i utrzymuje dostępność lokalną/LAN przez auto-restart
 
 Testowanie desktop + telefon (ta sama sieć Wi-Fi/LAN):

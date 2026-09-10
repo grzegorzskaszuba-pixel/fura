@@ -25,7 +25,7 @@ import { sortEventsAsc, sortEventsDesc } from '@/shared/lib/format'
 import type { ServiceEvent, ServiceEventFormValues, ServiceTab, UserProfile, Vehicle, VehicleFormValues } from '@/shared/types/domain'
 
 const LOGO_PHASE_INTERVAL_MS = 2800
-const logoPhases = ['text', 'pill', 'icon', 'pill'] as const
+const logoPhases = ['text', 'pill-dark', 'icon', 'pill-dark', 'pill-light'] as const
 type LogoPhase = (typeof logoPhases)[number]
 
 export default function App() {
@@ -432,11 +432,11 @@ export default function App() {
               </DropdownMenu>
             ) : null}
           </div>
-          <div className="relative inline-flex h-[60px] w-[176px] items-center justify-end pr-2 sm:h-[72px] sm:w-[210px] sm:pr-3" aria-label="Branding FURA">
+          <div className="relative inline-flex h-14 w-[220px] items-center justify-end pr-4 sm:w-[260px]" aria-label="Branding FURA">
             <span
               aria-hidden="true"
               className={cn(
-                'absolute right-0 top-1/2 -translate-y-1/2 text-[46px] font-semibold leading-none tracking-[-0.08em] text-zinc-950 transition-all duration-700 ease-in-out',
+                'absolute right-0 top-1/2 -translate-y-1/2 text-[52px] font-semibold leading-none tracking-[-0.08em] text-zinc-950 transition-all duration-700 ease-in-out',
                 logoPhase === 'text' ? 'opacity-100 blur-0 scale-100' : 'opacity-0 blur-[1px] scale-95',
               )}
             >
@@ -446,23 +446,24 @@ export default function App() {
             <span
               aria-hidden="true"
               className={cn(
-                'absolute right-0 top-1/2 inline-flex h-[46px] -translate-y-1/2 items-center justify-center overflow-hidden bg-zinc-950 text-white transition-all duration-700 ease-in-out',
-                logoPhase === 'pill' ? 'w-[140px] rounded-full opacity-100' : '',
-                logoPhase === 'icon' ? 'w-[46px] rounded-full opacity-100' : '',
-                logoPhase === 'text' ? 'w-[108px] rounded-full opacity-0 scale-90' : '',
+                'absolute right-0 top-1/2 inline-flex h-14 -translate-y-1/2 items-center justify-center overflow-hidden shadow-sm ring-1 transition-all duration-700 ease-in-out',
+                logoPhase === 'pill-dark' ? 'w-[168px] rounded-full bg-zinc-950 text-white ring-zinc-950/90 opacity-100' : '',
+                logoPhase === 'pill-light' ? 'w-[168px] rounded-full bg-white text-zinc-950 ring-zinc-200/80 opacity-100' : '',
+                logoPhase === 'icon' ? 'w-14 rounded-full bg-zinc-950 text-white ring-zinc-950/90 opacity-100' : '',
+                logoPhase === 'text' ? 'w-[132px] rounded-full bg-white text-zinc-950 ring-zinc-200/80 opacity-0 scale-95' : '',
               )}
             >
               <span
                 className={cn(
-                  'absolute text-[46px] font-semibold leading-none tracking-[-0.08em] transition-opacity duration-500',
-                  logoPhase === 'pill' ? 'opacity-100' : 'opacity-0',
+                  'absolute text-[52px] font-semibold leading-none tracking-[-0.08em] transition-opacity duration-500',
+                  logoPhase === 'pill-dark' || logoPhase === 'pill-light' ? 'opacity-100' : 'opacity-0',
                 )}
               >
                 FURA
               </span>
               <span
                 className={cn(
-                  'absolute text-[46px] font-semibold leading-none tracking-[-0.08em] transition-opacity duration-500',
+                  'absolute text-[52px] font-semibold leading-none tracking-[-0.08em] transition-opacity duration-500',
                   logoPhase === 'icon' ? 'opacity-100' : 'opacity-0',
                 )}
               >
