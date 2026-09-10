@@ -21,14 +21,16 @@ export function VehicleCarousel({ vehicles, activeVehicleId, onVehicleSelect }: 
   const dragDeltaXRef = useRef(0)
   const dragFrameRef = useRef<number | null>(null)
   const isDraggingRef = useRef(false)
-  const vinTouchStartAtRef = useRef<number | null>(null)
   const previousActiveIndex = useRef(0)
   const vinHoldTimeoutRef = useRef<number | null>(null)
+  const vinHoldStartAtRef = useRef<number | null>(null)
+  const vinProgressFrameRef = useRef<number | null>(null)
   const vinPromptTimeoutRef = useRef<number | null>(null)
   const [animationDirection, setAnimationDirection] = useState<'left' | 'right'>('left')
   const [dragOffset, setDragOffset] = useState(0)
   const [isDragging, setIsDragging] = useState(false)
   const [vinCopied, setVinCopied] = useState(false)
+  const [vinHoldProgress, setVinHoldProgress] = useState(0)
   const activeIndex = Math.max(
     vehicles.findIndex((vehicle) => vehicle.id === activeVehicleId),
     0,
@@ -59,6 +61,10 @@ export function VehicleCarousel({ vehicles, activeVehicleId, onVehicleSelect }: 
 
       if (vinHoldTimeoutRef.current !== null) {
         window.clearTimeout(vinHoldTimeoutRef.current)
+      }
+
+      if (vinProgressFrameRef.current !== null) {
+        window.cancelAnimationFrame(vinProgressFrameRef.current)
       }
 
       if (vinPromptTimeoutRef.current !== null) {
@@ -179,6 +185,51 @@ export function VehicleCarousel({ vehicles, activeVehicleId, onVehicleSelect }: 
     }
   }
 
+  function stopVinProgress(reset = true) {
+    if (vinProgressFrameRef.current !== null) {
+      window.cancelAnimationFrame(vinProgressFrameRef.current)
+      vinProgressFrameRef.current = null
+    }
+
+    vinHoldStartAtRef.current = null
+
+    if (reset) {
+      setVinHoldProgress(0)
+    }
+  }
+
+  function startVinHoldCountdown() {
+    clearVinHoldTimer()
+    stopVinProgress()
+
+    const startedAt = performance.now()
+    vinHoldStartAtRef.current = startedAt
+    setVinHoldProgress(0)
+
+    const tick = () => {
+      if (vinHoldStartAtRef.current === null) {
+        return
+      }
+
+      const elapsed = performance.now() - vinHoldStartAtRef.current
+      const progress = Math.min(1, elapsed / VIN_COPY_HOLD_MS)
+      setVinHoldProgress(progress)
+
+      if (progress < 1) {
+        vinProgressFrameRef.current = window.requestAnimationFrame(tick)
+      } else {
+        vinProgressFrameRef.current = null
+      }
+    }
+
+    vinProgressFrameRef.current = window.requestAnimationFrame(tick)
+    vinHoldTimeoutRef.current = window.setTimeout(() => {
+      setVinHoldProgress(1)
+      void copyVinToClipboard()
+      clearVinHoldTimer()
+    }, VIN_COPY_HOLD_MS)
+  }
+
   async function copyVinToClipboard() {
     if (!activeVehicle.vin || !navigator.clipboard) {
       if (!activeVehicle.vin) {
@@ -238,40 +289,29 @@ export function VehicleCarousel({ vehicles, activeVehicleId, onVehicleSelect }: 
       return
     }
 
-    clearVinHoldTimer()
-    vinHoldTimeoutRef.current = window.setTimeout(() => {
-      void copyVinToClipboard()
-      vinHoldTimeoutRef.current = null
-    }, VIN_COPY_HOLD_MS)
+    startVinHoldCountdown()
   }
 
   function handleVinPointerUp() {
     clearVinHoldTimer()
+    stopVinProgress()
   }
 
   function handleVinTouchStart(event: React.TouchEvent<HTMLButtonElement>) {
     event.stopPropagation()
-    vinTouchStartAtRef.current = Date.now()
+    startVinHoldCountdown()
   }
 
   function handleVinTouchEnd(event: React.TouchEvent<HTMLButtonElement>) {
     event.stopPropagation()
-
-    if (vinTouchStartAtRef.current === null) {
-      return
-    }
-
-    const heldFor = Date.now() - vinTouchStartAtRef.current
-    vinTouchStartAtRef.current = null
-
-    if (heldFor >= VIN_COPY_HOLD_MS) {
-      void copyVinToClipboard()
-    }
+    clearVinHoldTimer()
+    stopVinProgress()
   }
 
   function handleVinTouchCancel(event: React.TouchEvent<HTMLButtonElement>) {
     event.stopPropagation()
-    vinTouchStartAtRef.current = null
+    clearVinHoldTimer()
+    stopVinProgress()
   }
 
   function renderMainVehicle(vehicle: Vehicle) {
@@ -339,7 +379,7 @@ export function VehicleCarousel({ vehicles, activeVehicleId, onVehicleSelect }: 
           </div>
         </div>
 
-        <div className="mx-auto w-full max-w-[260px] px-2 pb-2 pt-5 text-center sm:max-w-[420px] sm:px-0 lg:max-w-[520px]">
+        <div className="mx-auto w-full max-w-[260px] px-2 pb-[3px] pt-5 text-center sm:max-w-[420px] sm:px-0 lg:max-w-[520px]">
           <div className="space-y-0.5">
             <h2 data-testid="active-vehicle-name" className="text-[2rem] font-semibold tracking-[-0.05em] text-zinc-950">
               {activeVehicle.name}
@@ -348,7 +388,7 @@ export function VehicleCarousel({ vehicles, activeVehicleId, onVehicleSelect }: 
               <div className="relative flex justify-center pb-0.5">
                 <button
                   type="button"
-                  className="select-none px-1 py-0.5 text-center text-xs font-medium tracking-[0.08em] text-zinc-700 [-webkit-touch-callout:none]"
+                  className="relative inline-flex select-none items-center justify-center overflow-hidden rounded-full border border-zinc-300/70 bg-white/45 px-3 py-1 text-center text-[11px] font-medium tracking-[0.08em] text-zinc-700 shadow-[0_4px_14px_rgba(15,23,42,0.05)] backdrop-blur-sm transition-colors hover:border-zinc-400/70 hover:bg-white/55 [-webkit-touch-callout:none]"
                   onPointerDown={handleVinPointerDown}
                   onPointerUp={handleVinPointerUp}
                   onPointerLeave={handleVinPointerUp}
@@ -358,7 +398,13 @@ export function VehicleCarousel({ vehicles, activeVehicleId, onVehicleSelect }: 
                   onTouchCancel={handleVinTouchCancel}
                   onContextMenu={(event) => event.preventDefault()}
                 >
-                  {activeVehicle.vin}
+                  <span className="relative z-10">{activeVehicle.vin}</span>
+                  <span className="pointer-events-none absolute inset-x-0 bottom-0 h-[2px] bg-zinc-300/40">
+                    <span
+                      className="absolute inset-0 origin-left bg-zinc-700/55"
+                      style={{ transform: `scaleX(${vinHoldProgress})` }}
+                    />
+                  </span>
                 </button>
                 <span
                   className={cn(
