@@ -13,20 +13,26 @@ services:
       - key: AUTH_STORAGE
         value: postgres
       - key: AUTH_DATABASE_SSL
-        value: require
+        value: disable
       - key: AUTH_API_HOST
         value: 0.0.0.0
       - key: AUTH_COOKIE_SAME_SITE
-        value: None
+        value: Lax
       - key: AUTH_COOKIE_SECURE
         value: "true"
+      - key: AUTH_DATABASE_MAX_ATTEMPTS
+        value: "8"
+      - key: AUTH_DATABASE_RETRY_DELAY_MS
+        value: "250"
+      - key: AUTH_DATABASE_RETRY_MAX_DELAY_MS
+        value: "5000"
       - key: DATABASE_URL
         fromDatabase:
           name: fura-db
-          property: connectionString
+          property: internalConnectionString
       # Update this after first deploy if your frontend URL differs.
       - key: AUTH_API_ALLOWED_ORIGINS
-        value: https://fura-web.onrender.com
+        value: https://fura.info,https://www.fura.info,https://fura-web.onrender.com
 
   - type: web
     name: fura-web
@@ -39,7 +45,7 @@ services:
         value: 20
       # Update if your API hostname differs.
       - key: VITE_API_BASE_URL
-        value: https://fura-api.onrender.com/api
+        value: https://api.fura.info/api
     routes:
       - type: rewrite
         source: /*

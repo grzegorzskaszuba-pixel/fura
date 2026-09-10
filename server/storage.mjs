@@ -140,8 +140,9 @@ function toStorageError(error) {
 }
 
 async function withPostgresRetry(operation) {
-  const maxAttempts = Number(process.env.AUTH_DATABASE_MAX_ATTEMPTS ?? 3)
-  const baseDelayMs = Number(process.env.AUTH_DATABASE_RETRY_DELAY_MS ?? 120)
+  const maxAttempts = Number(process.env.AUTH_DATABASE_MAX_ATTEMPTS ?? 8)
+  const baseDelayMs = Number(process.env.AUTH_DATABASE_RETRY_DELAY_MS ?? 250)
+  const maxDelayMs = Number(process.env.AUTH_DATABASE_RETRY_MAX_DELAY_MS ?? 5000)
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     try {
@@ -153,7 +154,9 @@ async function withPostgresRetry(operation) {
         throw toStorageError(error)
       }
 
-      const delayMs = baseDelayMs * attempt
+      const exponential = baseDelayMs * 2 ** (attempt - 1)
+      const jitter = Math.floor(Math.random() * Math.max(25, Math.floor(baseDelayMs / 2)))
+      const delayMs = Math.min(maxDelayMs, exponential + jitter)
       await wait(delayMs)
     }
   }
