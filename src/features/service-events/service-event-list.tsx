@@ -123,7 +123,7 @@ export function ServiceEventList({ tab, vehicle, events, onTabChange, onEventCli
                         role="button"
                         tabIndex={0}
                         data-testid={`service-event-${event.id}`}
-                        className="grid w-full grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-2 px-4 py-3 text-left transition hover:bg-zinc-50 sm:grid-cols-[70px_110px_minmax(0,1fr)_110px_64px] sm:gap-4 sm:px-6 sm:py-4"
+                        className="grid w-full grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-2 px-4 py-3 text-left transition hover:bg-zinc-50 sm:grid-cols-[70px_110px_minmax(0,1fr)_max-content_max-content] sm:gap-4 sm:px-6 sm:py-4"
                         onClick={() => onEventClick(event)}
                         onKeyDown={(keyboardEvent) => handleEventKeyDown(keyboardEvent, event)}
                       >
