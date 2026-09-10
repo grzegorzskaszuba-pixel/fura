@@ -1194,13 +1194,6 @@ async function handleAuthRequest(request, response) {
       }
 
       const profile = loginProfile(localState, payload)
-      const updatedProfile = localState.profiles[0]
-      const updatedCredential = localState.credentials[0]
-
-      await postgresTransaction(async (client) => {
-        await client.query('UPDATE profiles SET updated_at = $1 WHERE id = $2', [updatedProfile.updatedAt, updatedProfile.id])
-        await client.query('UPDATE credentials SET updated_at = $1 WHERE profile_id = $2', [updatedCredential.updatedAt, updatedCredential.profileId])
-      })
 
       const sessionId = createSession(profile.id)
       setSessionCookie(response, sessionId)
