@@ -55,10 +55,10 @@ Komenda uruchamia stabilny lokalny stack (API + frontend) na stałych portach:
 
 Skrypt startup nadzoruje procesy API/web i wznawia je po awarii, bez agresywnego ubijania procesów po porcie przy każdym starcie.
 
-Tryb trwały w VS Code:
+Tryb lokalny (prosty i przewidywalny):
 
-- po otwarciu workspace VS Code automatycznie uruchamia task `Carlog: Dev Stack`
-- task działa do zamknięcia VS Code i utrzymuje dostępność lokalną/LAN przez auto-restart
+- uruchamiaj ręcznie `npm run dev` w jednym terminalu
+- nie uruchamiaj drugiej instancji, dopóki pierwsza działa
 
 Testowanie desktop + telefon (ta sama sieć Wi-Fi/LAN):
 

@@ -24,8 +24,8 @@ import { cn, getTodayIsoDate } from '@/shared/lib/utils'
 import { sortEventsAsc, sortEventsDesc } from '@/shared/lib/format'
 import type { ServiceEvent, ServiceEventFormValues, ServiceTab, UserProfile, Vehicle, VehicleFormValues } from '@/shared/types/domain'
 
-const LOGO_PHASE_INTERVAL_MS = 2800
-const logoPhases = ['text', 'pill-dark', 'icon', 'pill-dark', 'pill-light'] as const
+const LOGO_PHASE_INTERVAL_MS = 10000
+const logoPhases = ['pill-dark', 'icon', 'pill-dark', 'pill-light'] as const
 type LogoPhase = (typeof logoPhases)[number]
 
 export default function App() {
@@ -436,26 +436,16 @@ export default function App() {
             <span
               aria-hidden="true"
               className={cn(
-                'absolute right-0 top-1/2 -translate-y-1/2 text-[52px] font-semibold leading-none tracking-[-0.08em] text-zinc-950 transition-all duration-700 ease-in-out',
-                logoPhase === 'text' ? 'opacity-100 blur-0 scale-100' : 'opacity-0 blur-[1px] scale-95',
-              )}
-            >
-              FURA
-            </span>
-
-            <span
-              aria-hidden="true"
-              className={cn(
                 'absolute right-0 top-1/2 inline-flex h-14 -translate-y-1/2 items-center justify-center overflow-hidden shadow-sm ring-1 transition-all duration-700 ease-in-out',
-                logoPhase === 'pill-dark' ? 'w-[168px] rounded-full bg-zinc-950 text-white ring-zinc-950/90 opacity-100' : '',
-                logoPhase === 'pill-light' ? 'w-[168px] rounded-full bg-white text-zinc-950 ring-zinc-200/80 opacity-100' : '',
+                logoPhase === 'pill-dark' ? 'w-[168px] rounded-full bg-zinc-950 px-4 text-white ring-zinc-950/90 opacity-100' : '',
+                logoPhase === 'pill-light' ? 'w-[168px] rounded-full bg-white px-4 text-zinc-950 ring-zinc-200/80 opacity-100' : '',
                 logoPhase === 'icon' ? 'w-14 rounded-full bg-zinc-950 text-white ring-zinc-950/90 opacity-100' : '',
-                logoPhase === 'text' ? 'w-[132px] rounded-full bg-white text-zinc-950 ring-zinc-200/80 opacity-0 scale-95' : '',
+                logoPhase !== 'pill-dark' && logoPhase !== 'pill-light' && logoPhase !== 'icon' ? 'opacity-0 scale-95' : '',
               )}
             >
               <span
                 className={cn(
-                  'absolute text-[52px] font-semibold leading-none tracking-[-0.08em] transition-opacity duration-500',
+                  'absolute inset-0 grid -translate-x-[0.05em] place-items-center text-[52px] font-semibold leading-none tracking-[-0.08em] transition-opacity duration-500',
                   logoPhase === 'pill-dark' || logoPhase === 'pill-light' ? 'opacity-100' : 'opacity-0',
                 )}
               >
@@ -463,7 +453,7 @@ export default function App() {
               </span>
               <span
                 className={cn(
-                  'absolute text-[52px] font-semibold leading-none tracking-[-0.08em] transition-opacity duration-500',
+                  'absolute inset-0 grid -translate-x-[0.05em] place-items-center text-[52px] font-semibold leading-none tracking-[-0.08em] transition-opacity duration-500',
                   logoPhase === 'icon' ? 'opacity-100' : 'opacity-0',
                 )}
               >
