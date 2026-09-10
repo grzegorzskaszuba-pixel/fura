@@ -1,4 +1,5 @@
 import { CalendarDays, Gauge, ReceiptText, Wrench } from 'lucide-react'
+import { useEffect, useState } from 'react'
 
 import { Card, CardContent } from '@/shared/components/ui/card'
 import { formatCurrency, formatDate, formatMileage, getEventTotalCost } from '@/shared/lib/format'
@@ -10,10 +11,43 @@ interface ServiceSummaryProps {
   plannedEvents: ServiceEvent[]
 }
 
-function getSummaryStats(vehicle: Vehicle, completedEvents: ServiceEvent[], plannedEvents: ServiceEvent[]) {
+function getDaysUntilText(eventDate?: string) {
+  if (!eventDate) {
+    return 'Brak planu'
+  }
+
+  const now = new Date()
+  const target = new Date(eventDate)
+
+  if (Number.isNaN(target.getTime())) {
+    return 'Brak planu'
+  }
+
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const startOfTargetDay = new Date(target.getFullYear(), target.getMonth(), target.getDate())
+  const diffMs = startOfTargetDay.getTime() - startOfToday.getTime()
+  const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24))
+
+  if (diffDays < 0) {
+    return `${Math.abs(diffDays)} dni po terminie`
+  }
+
+  if (diffDays === 0) {
+    return 'Dzisiaj'
+  }
+
+  return `Za ${diffDays} ${diffDays === 1 ? 'dzień' : 'dni'}`
+}
+
+function getSummaryStats(vehicle: Vehicle, completedEvents: ServiceEvent[], plannedEvents: ServiceEvent[], showAltView: boolean) {
   const totalSpend = completedEvents.reduce((sum, event) => sum + getEventTotalCost(event), 0)
   const lastService = completedEvents[0]
   const nextService = plannedEvents[0]
+  const nextServiceDate = formatDate(nextService?.eventDate)
+  const nextServiceInDays = getDaysUntilText(nextService?.eventDate)
+  const nextServiceMileageHint =
+    nextService?.mileage && vehicle.currentMileage ? `Za ${formatMileage(nextService.mileage - vehicle.currentMileage)}` : null
+  const showLastExpense = showAltView && Boolean(lastService)
 
   return [
     {
@@ -24,8 +58,8 @@ function getSummaryStats(vehicle: Vehicle, completedEvents: ServiceEvent[], plan
     },
     {
       label: 'Następny serwis',
-      value: nextService?.mileage && vehicle.currentMileage ? `Za ${formatMileage(nextService.mileage - vehicle.currentMileage)}` : formatDate(nextService?.eventDate),
-      hint: nextService?.eventDate ? `lub ${formatDate(nextService.eventDate)}` : 'Brak planu',
+      value: showAltView ? nextServiceInDays : nextServiceDate,
+      hint: nextServiceMileageHint ?? (showAltView ? nextServiceDate : nextServiceInDays),
       icon: CalendarDays,
     },
     {
@@ -36,15 +70,27 @@ function getSummaryStats(vehicle: Vehicle, completedEvents: ServiceEvent[], plan
     },
     {
       label: 'Wydatki',
-      value: formatCurrency(totalSpend),
-      hint: 'Wszystkie',
+      value: showLastExpense ? formatCurrency(getEventTotalCost(lastService as ServiceEvent)) : formatCurrency(totalSpend),
+      hint: showLastExpense ? 'Ostatni' : 'Wszystkie',
       icon: ReceiptText,
     },
   ]
 }
 
 export function ServiceSummary({ vehicle, completedEvents, plannedEvents }: ServiceSummaryProps) {
-  const items = getSummaryStats(vehicle, completedEvents, plannedEvents)
+  const [showAltView, setShowAltView] = useState(false)
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      setShowAltView((prev) => !prev)
+    }, 5000)
+
+    return () => {
+      window.clearInterval(intervalId)
+    }
+  }, [])
+
+  const items = getSummaryStats(vehicle, completedEvents, plannedEvents, showAltView)
 
   return (
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
