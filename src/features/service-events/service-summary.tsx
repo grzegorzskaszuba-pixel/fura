@@ -264,9 +264,9 @@ export function ServiceSummary({ vehicle, completedEvents, plannedEvents, onNext
         description="Podsumowanie kosztów wykonanych serwisów"
       >
         <div className="space-y-5">
-          <div className="flex flex-col items-center gap-3 rounded-[28px] bg-zinc-50 p-4">
+          <div className="flex flex-col items-center gap-3 p-4">
             <div className="relative h-44 w-44 rounded-full" style={donutStyle}>
-              <div className="absolute inset-[22%] grid place-items-center rounded-full bg-white text-center shadow-sm ring-1 ring-zinc-200">
+              <div className="absolute inset-[22%] grid place-items-center rounded-full bg-white text-center">
                 <div>
                   <p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-zinc-400">Suma</p>
                   <p className="mt-1 text-sm font-semibold text-zinc-950">{formatCurrency(categorySummary.total)}</p>
@@ -286,10 +286,10 @@ export function ServiceSummary({ vehicle, completedEvents, plannedEvents, onNext
                   const percent = categorySummary.total > 0 ? (entry.value / categorySummary.total) * 100 : 0
 
                   return (
-                    <div key={entry.category} className="grid grid-cols-[auto,1fr,auto] items-center gap-3 rounded-2xl bg-zinc-50 px-3 py-2">
+                    <div key={entry.category} className="flex items-center gap-3 rounded-2xl bg-zinc-50 px-3 py-2">
                       <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: entry.color }} aria-hidden="true" />
-                      <span className="text-sm text-zinc-700">{entry.label}</span>
-                      <span className="text-sm font-semibold text-zinc-950">{formatCurrency(entry.value)} ({percent.toFixed(0)}%)</span>
+                      <span className="min-w-0 flex-1 truncate text-sm text-zinc-700">{entry.label}</span>
+                      <span className="shrink-0 whitespace-nowrap text-sm font-semibold text-zinc-950">{formatCurrency(entry.value)} ({percent.toFixed(0)}%)</span>
                     </div>
                   )
                 })}
