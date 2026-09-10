@@ -23,9 +23,10 @@ import { getDefaultVehicleImage } from '@/shared/constants/vehicle-images'
 import { cn, getTodayIsoDate } from '@/shared/lib/utils'
 import { sortEventsAsc, sortEventsDesc } from '@/shared/lib/format'
 import type { ServiceEvent, ServiceEventFormValues, ServiceTab, UserProfile, Vehicle, VehicleFormValues } from '@/shared/types/domain'
-import furaLogo from '@/shared/components/ui/logo/fura.png'
 
-const LOGO_SWAP_INTERVAL_MS = 12000
+const LOGO_PHASE_INTERVAL_MS = 2800
+const logoPhases = ['text', 'pill', 'icon', 'pill'] as const
+type LogoPhase = (typeof logoPhases)[number]
 
 export default function App() {
   const [serviceTab, setServiceTab] = useState<ServiceTab>('history')
@@ -44,13 +45,14 @@ export default function App() {
   const [serviceEvents, setServiceEvents] = useState<ServiceEvent[]>([])
   const [isBootstrapping, setIsBootstrapping] = useState(true)
   const [appError, setAppError] = useState<string | null>(null)
-  const [showLogoText, setShowLogoText] = useState(false)
+  const [logoPhaseIndex, setLogoPhaseIndex] = useState(0)
   const [deleteVehicleDialogOpen, setDeleteVehicleDialogOpen] = useState(false)
 
   const activeVehicle = useMemo(() => vehicles.find((vehicle) => vehicle.id === activeVehicleId) ?? vehicles[0] ?? null, [activeVehicleId, vehicles])
   const editingVehicle = useMemo(() => vehicles.find((vehicle) => vehicle.id === editingVehicleId) ?? null, [editingVehicleId, vehicles])
   const editingEvent = useMemo(() => serviceEvents.find((event) => event.id === editingEventId) ?? null, [editingEventId, serviceEvents])
   const detailEvent = useMemo(() => serviceEvents.find((event) => event.id === detailEventId) ?? null, [detailEventId, serviceEvents])
+  const logoPhase: LogoPhase = logoPhases[logoPhaseIndex]
 
   async function loadProfileWorkspace(profileId: string) {
     const [profile, savedVehicleId, profileVehicles] = await Promise.all([
@@ -113,12 +115,12 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    const swapInterval = window.setInterval(() => {
-      setShowLogoText((prev) => !prev)
-    }, LOGO_SWAP_INTERVAL_MS)
+    const phaseInterval = window.setInterval(() => {
+      setLogoPhaseIndex((prev) => (prev + 1) % logoPhases.length)
+    }, LOGO_PHASE_INTERVAL_MS)
 
     return () => {
-      window.clearInterval(swapInterval)
+      window.clearInterval(phaseInterval)
     }
   }, [])
 
@@ -430,23 +432,42 @@ export default function App() {
               </DropdownMenu>
             ) : null}
           </div>
-          <div className="brand-switch relative inline-flex h-[60px] w-[120px] items-center justify-center sm:h-[72px] sm:w-[144px]" aria-label="Branding FURA">
-            <img
-              src={furaLogo}
-              alt="Logo FURA"
-              className={cn(
-                'brand-face h-[60px] w-auto object-contain sm:h-[72px]',
-                showLogoText ? 'app-logo-hidden' : 'app-logo-visible',
-              )}
-            />
+          <div className="relative inline-flex h-[60px] w-[176px] items-center justify-end pr-2 sm:h-[72px] sm:w-[210px] sm:pr-3" aria-label="Branding FURA">
             <span
               aria-hidden="true"
               className={cn(
-                'brand-face app-logo-text text-[40px] font-semibold leading-none tracking-[-0.08em] text-zinc-950',
-                showLogoText ? 'app-logo-visible app-logo-text-shine-trigger' : 'app-logo-hidden',
+                'absolute right-0 top-1/2 -translate-y-1/2 text-[46px] font-semibold leading-none tracking-[-0.08em] text-zinc-950 transition-all duration-700 ease-in-out',
+                logoPhase === 'text' ? 'opacity-100 blur-0 scale-100' : 'opacity-0 blur-[1px] scale-95',
               )}
             >
               FURA
+            </span>
+
+            <span
+              aria-hidden="true"
+              className={cn(
+                'absolute right-0 top-1/2 inline-flex h-[46px] -translate-y-1/2 items-center justify-center overflow-hidden bg-zinc-950 text-white transition-all duration-700 ease-in-out',
+                logoPhase === 'pill' ? 'w-[140px] rounded-full opacity-100' : '',
+                logoPhase === 'icon' ? 'w-[46px] rounded-full opacity-100' : '',
+                logoPhase === 'text' ? 'w-[108px] rounded-full opacity-0 scale-90' : '',
+              )}
+            >
+              <span
+                className={cn(
+                  'absolute text-[46px] font-semibold leading-none tracking-[-0.08em] transition-opacity duration-500',
+                  logoPhase === 'pill' ? 'opacity-100' : 'opacity-0',
+                )}
+              >
+                FURA
+              </span>
+              <span
+                className={cn(
+                  'absolute text-[46px] font-semibold leading-none tracking-[-0.08em] transition-opacity duration-500',
+                  logoPhase === 'icon' ? 'opacity-100' : 'opacity-0',
+                )}
+              >
+                F
+              </span>
             </span>
           </div>
         </header>
