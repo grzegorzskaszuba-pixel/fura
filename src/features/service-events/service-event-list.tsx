@@ -46,6 +46,15 @@ interface ServiceEventListProps {
   onEventClick: (event: ServiceEvent) => void
 }
 
+function getMileageIncrease(currentMileage?: number, previousMileage?: number) {
+  if (currentMileage === undefined || previousMileage === undefined) {
+    return null
+  }
+
+  const increase = currentMileage - previousMileage
+  return increase > 0 ? increase : null
+}
+
 export function ServiceEventList({ tab, vehicle, events, onTabChange, onEventClick }: ServiceEventListProps) {
   const touchStartX = useRef<number | null>(null)
 
@@ -113,9 +122,10 @@ export function ServiceEventList({ tab, vehicle, events, onTabChange, onEventCli
             <CardContent className="p-0">
               <div className="relative">
                 <div className="divide-y divide-zinc-100">
-                  {events.map((event) => {
+                  {events.map((event, index) => {
                     const Icon = iconMap[event.category]
                     const urgency = event.status === 'planned' ? getPlannedEventUrgency(event, vehicle.currentMileage) : null
+                    const mileageIncrease = tab === 'history' ? getMileageIncrease(event.mileage, events[index + 1]?.mileage) : null
 
                     return (
                       <div
@@ -134,7 +144,10 @@ export function ServiceEventList({ tab, vehicle, events, onTabChange, onEventCli
                         </div>
                         <div className="hidden space-y-1 sm:block">
                           <p className="text-sm font-semibold text-zinc-950">{formatDate(event.eventDate)}</p>
-                          <p className="text-sm text-zinc-500">{formatMileage(event.mileage)}</p>
+                          <p className="flex items-center gap-1 text-sm text-zinc-500">
+                            <span>{formatMileage(event.mileage)}</span>
+                            {mileageIncrease !== null ? <span className="text-primary">(+ {formatMileage(mileageIncrease)})</span> : null}
+                          </p>
                         </div>
                         <div className="min-w-0 space-y-1 sm:space-y-1.5">
                           <div className="flex items-center gap-3 sm:hidden">
@@ -151,6 +164,7 @@ export function ServiceEventList({ tab, vehicle, events, onTabChange, onEventCli
                             <span className="font-medium text-zinc-700">{formatDate(event.eventDate)}</span>
                             <span className="text-zinc-300">•</span>
                             <span>{formatMileage(event.mileage)}</span>
+                            {mileageIncrease !== null ? <span className="text-primary">(+ {formatMileage(mileageIncrease)})</span> : null}
                           </div>
                           <p className="truncate text-xs text-zinc-500 sm:text-sm">{event.description || serviceCategoryLabels[event.category]}</p>
                         </div>
