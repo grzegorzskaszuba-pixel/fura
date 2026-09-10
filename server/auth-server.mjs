@@ -9,7 +9,7 @@ import {
   registerProfile,
   resetPassword,
 } from './auth-core.mjs'
-import { readState, writeState } from './storage.mjs'
+import { StorageError, readState, writeState } from './storage.mjs'
 
 const PORT = Number(process.env.AUTH_API_PORT ?? process.env.PORT ?? 8787)
 const HOST = process.env.AUTH_API_HOST ?? '0.0.0.0'
@@ -25,6 +25,49 @@ const ALLOWED_ORIGINS = String(process.env.AUTH_API_ALLOWED_ORIGINS ?? '*')
   .filter((origin) => origin.length > 0)
 const sessions = new Map()
 const startedAt = new Date().toISOString()
+
+function isInputError(error) {
+  if (!(error instanceof Error)) {
+    return false
+  }
+
+  const normalized = error.message
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLowerCase()
+
+  return (
+    normalized.includes('podaj ') ||
+    normalized.includes('nieprawidlow') ||
+    normalized.includes('nie znaleziono ') ||
+    normalized.includes('taki profil juz istnieje') ||
+    normalized.includes('profil nie istnieje') ||
+    normalized.includes('brak ') ||
+    normalized.includes('musi miec co najmniej') ||
+    normalized.includes('nie istnieje')
+  )
+}
+
+function mapErrorToResponse(error) {
+  if (error instanceof StorageError) {
+    return {
+      statusCode: error.statusCode,
+      message: error.message,
+    }
+  }
+
+  if (isInputError(error)) {
+    return {
+      statusCode: 400,
+      message: error.message,
+    }
+  }
+
+  return {
+    statusCode: 500,
+    message: 'Wystapil nieoczekiwany blad serwera. Sprobuj ponownie za chwile.',
+  }
+}
 
 function getAllowedOrigin(requestOrigin) {
   if (!requestOrigin) {
@@ -712,8 +755,8 @@ const server = http.createServer(async (request, response) => {
   try {
     await handleAuthRequest(request, response)
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Internal server error'
-    setJson(response, 400, { message })
+    const mapped = mapErrorToResponse(error)
+    setJson(response, mapped.statusCode, { message: mapped.message })
   }
 })
 

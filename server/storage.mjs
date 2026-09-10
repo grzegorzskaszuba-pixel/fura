@@ -49,10 +49,96 @@ const pgPool = usePostgres
   ? new Pool({
       connectionString: postgresUrl,
       ssl: resolvePostgresSsl(),
+      max: Number(process.env.AUTH_DATABASE_POOL_MAX ?? 10),
+      connectionTimeoutMillis: Number(process.env.AUTH_DATABASE_CONNECTION_TIMEOUT_MS ?? 10000),
+      idleTimeoutMillis: Number(process.env.AUTH_DATABASE_IDLE_TIMEOUT_MS ?? 30000),
     })
   : null
 
 let pgInitialized = false
+
+export class StorageError extends Error {
+  constructor(message, options = {}) {
+    super(message)
+    this.name = 'StorageError'
+    this.statusCode = options.statusCode ?? 500
+    this.retryable = options.retryable ?? false
+    this.cause = options.cause
+  }
+}
+
+function wait(ms) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms)
+  })
+}
+
+function isTransientPostgresError(error) {
+  const code = typeof error?.code === 'string' ? error.code : ''
+  const message = String(error?.message ?? '').toLowerCase()
+
+  if (code === '57P01' || code === '57P02' || code === '57P03' || code === '08000' || code === '08001' || code === '08003' || code === '08004' || code === '08006') {
+    return true
+  }
+
+  return (
+    message.includes('connection terminated unexpectedly') ||
+    message.includes('terminating connection') ||
+    message.includes('connection reset') ||
+    message.includes('ecconnreset') ||
+    message.includes('connection timeout') ||
+    message.includes('client has encountered a connection error')
+  )
+}
+
+function toStorageError(error) {
+  if (error instanceof StorageError) {
+    return error
+  }
+
+  if (isTransientPostgresError(error)) {
+    return new StorageError('Tymczasowy problem z polaczeniem do bazy danych. Sprobuj ponownie.', {
+      statusCode: 503,
+      retryable: true,
+      cause: error,
+    })
+  }
+
+  return new StorageError('Nie udalo sie odczytac lub zapisac danych.', {
+    statusCode: 500,
+    retryable: false,
+    cause: error,
+  })
+}
+
+async function withPostgresRetry(operation) {
+  const maxAttempts = Number(process.env.AUTH_DATABASE_MAX_ATTEMPTS ?? 3)
+  const baseDelayMs = Number(process.env.AUTH_DATABASE_RETRY_DELAY_MS ?? 120)
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      return await operation()
+    } catch (error) {
+      const transient = isTransientPostgresError(error)
+
+      if (!transient || attempt === maxAttempts) {
+        throw toStorageError(error)
+      }
+
+      const delayMs = baseDelayMs * attempt
+      await wait(delayMs)
+    }
+  }
+
+  throw new StorageError('Nie udalo sie wykonac operacji bazy danych.')
+}
+
+if (pgPool) {
+  pgPool.on('error', (error) => {
+    // eslint-disable-next-line no-console
+    console.error('[storage] postgres pool idle client error:', error)
+  })
+}
 
 async function ensureStorageFile() {
   await mkdir(dataDir, { recursive: true })
@@ -92,17 +178,19 @@ async function ensurePostgresStorage() {
     return
   }
 
-  await pgPool.query(`
-    CREATE TABLE IF NOT EXISTS app_state (
-      id SMALLINT PRIMARY KEY,
-      state JSONB NOT NULL,
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      CHECK (id = 1)
-    )
-  `)
+  await withPostgresRetry(async () => {
+    await pgPool.query(`
+      CREATE TABLE IF NOT EXISTS app_state (
+        id SMALLINT PRIMARY KEY,
+        state JSONB NOT NULL,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        CHECK (id = 1)
+      )
+    `)
 
-  await pgPool.query('INSERT INTO app_state (id, state) VALUES (1, $1::jsonb) ON CONFLICT (id) DO NOTHING', [JSON.stringify(emptyState)])
-  pgInitialized = true
+    await pgPool.query('INSERT INTO app_state (id, state) VALUES (1, $1::jsonb) ON CONFLICT (id) DO NOTHING', [JSON.stringify(emptyState)])
+    pgInitialized = true
+  })
 }
 
 async function readStatePostgres() {
@@ -111,7 +199,7 @@ async function readStatePostgres() {
   }
 
   await ensurePostgresStorage()
-  const result = await pgPool.query('SELECT state FROM app_state WHERE id = 1 LIMIT 1')
+  const result = await withPostgresRetry(() => pgPool.query('SELECT state FROM app_state WHERE id = 1 LIMIT 1'))
   const candidate = result.rows[0]?.state ?? emptyState
   return normalizeState(candidate)
 }
@@ -123,10 +211,12 @@ async function writeStatePostgres(nextState) {
 
   await ensurePostgresStorage()
   const serializedState = JSON.stringify(normalizeState(nextState))
-  const result = await pgPool.query('UPDATE app_state SET state = $1::jsonb, updated_at = NOW() WHERE id = 1', [serializedState])
+  const result = await withPostgresRetry(() =>
+    pgPool.query('UPDATE app_state SET state = $1::jsonb, updated_at = NOW() WHERE id = 1', [serializedState]),
+  )
 
   if (result.rowCount === 0) {
-    await pgPool.query('INSERT INTO app_state (id, state) VALUES (1, $1::jsonb)', [serializedState])
+    await withPostgresRetry(() => pgPool.query('INSERT INTO app_state (id, state) VALUES (1, $1::jsonb)', [serializedState]))
   }
 }
 
