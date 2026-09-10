@@ -19,6 +19,7 @@ import { serviceCategoryOptions, serviceCategoryValues } from '@/shared/constant
 import { buildServiceAttachments, normalizeServiceAttachments } from '@/shared/lib/attachments'
 import { getTodayIsoDate } from '@/shared/lib/utils'
 import type { ServiceAttachment, ServiceEvent, ServiceEventFormValues } from '@/shared/types/domain'
+import { WorkshopLocationField } from '@/features/service-events/workshop-location-field'
 
 const supportedAttachmentExtensions = ['txt', 'pdf', 'csv', 'xls', 'xlsx', 'doc', 'docx', 'rtf', 'odt', 'ods', 'xml', 'json', 'jpg', 'jpeg', 'png']
 const supportedAttachmentMimeTypes = [
@@ -57,6 +58,15 @@ const serviceEventSchema = z.object({
   otherCost: z.number().min(0).optional(),
   description: z.string().trim().optional(),
   workshopName: z.string().trim().optional(),
+  workshopLocation: z
+    .object({
+      placeId: z.string().trim().min(1),
+      label: z.string().trim().min(1),
+      address: z.string().trim().optional(),
+      lat: z.number().finite(),
+      lng: z.number().finite(),
+    })
+    .optional(),
   attachmentCount: z.number().int().min(0).optional(),
   isRecurring: z.boolean().optional(),
   recurrenceType: z.enum(['time', 'mileage']).optional(),
@@ -124,6 +134,7 @@ const emptyValues: ServiceEventValues = {
   otherCost: undefined,
   description: '',
   workshopName: '',
+  workshopLocation: undefined,
   attachmentCount: 0,
   isRecurring: false,
   recurrenceType: 'time',
@@ -185,6 +196,7 @@ function toServiceEventFormDefaults(event?: ServiceEvent | null): ServiceEventVa
     otherCost: event.otherCost,
     description: event.description,
     workshopName: event.workshopName,
+    workshopLocation: event.workshopLocation,
     attachmentCount: event.attachmentCount,
     isRecurring: event.isRecurring ?? false,
     recurrenceType: event.recurrenceType ?? 'time',
@@ -259,6 +271,7 @@ export function ServiceEventForm({
         recurrenceIntervalValue: values.status === 'planned' && values.isRecurring && values.recurrenceType === 'time' ? values.recurrenceIntervalValue : undefined,
         recurrenceIntervalUnit: values.status === 'planned' && values.isRecurring && values.recurrenceType === 'time' ? values.recurrenceIntervalUnit : undefined,
         recurrenceMileageInterval: values.status === 'planned' && values.isRecurring && values.recurrenceType === 'mileage' ? values.recurrenceMileageInterval : undefined,
+        workshopLocation: values.workshopLocation,
         attachmentCount: serializedAttachments.length,
         attachmentNames: serializedAttachments.length > 0 ? serializedAttachments.map((attachment) => attachment.name) : undefined,
         attachments: serializedAttachments.length > 0 ? serializedAttachments : undefined,
@@ -512,7 +525,16 @@ export function ServiceEventForm({
           </div>
           <div className="space-y-2 sm:col-span-3">
             <Label htmlFor="service-workshop">Warsztat</Label>
-            <Input id="service-workshop" placeholder="Nazwa warsztatu" {...form.register('workshopName')} />
+            <WorkshopLocationField
+              workshopName={form.watch('workshopName') ?? ''}
+              workshopLocation={form.watch('workshopLocation')}
+              onWorkshopNameChange={(value) => {
+                form.setValue('workshopName', value, { shouldDirty: true })
+              }}
+              onWorkshopLocationChange={(value) => {
+                form.setValue('workshopLocation', value, { shouldDirty: true })
+              }}
+            />
           </div>
           <div className="space-y-2 sm:col-span-3">
             <Label htmlFor="service-description">Opis</Label>

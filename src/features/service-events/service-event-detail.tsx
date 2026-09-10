@@ -15,12 +15,14 @@ import {
 import { Badge } from '@/shared/components/ui/badge'
 import { Button } from '@/shared/components/ui/button'
 import { ResponsiveModal } from '@/shared/components/responsive-modal'
+import { GoogleMiniMap } from '@/shared/components/google-mini-map'
 import { useMediaQuery } from '@/shared/hooks/use-media-query'
 import { getAttachmentExtension, isImageAttachment, normalizeServiceAttachments } from '@/shared/lib/attachments'
 import { serviceCategoryLabels } from '@/shared/constants/service-categories'
 import { cn } from '@/shared/lib/utils'
 import { formatCurrency, formatDate, formatMileage, getEventTotalCost, getPlannedEventUrgency } from '@/shared/lib/format'
 import type { ServiceAttachment, ServiceEvent, Vehicle } from '@/shared/types/domain'
+import { appConfig } from '@/shared/config/app-config'
 
 interface ServiceEventDetailProps {
   event: ServiceEvent | null
@@ -112,19 +114,6 @@ export function ServiceEventDetail({ event, vehicle, open, onOpenChange, onEdit,
         description={serviceCategoryLabels[event.category]}
       >
       <div className="space-y-5">
-        {isMobile ? (
-          <div className="flex justify-end">
-            <button
-              type="button"
-              aria-label="Zamknij szczegóły wpisu"
-              className="inline-flex h-10 w-10 items-center justify-center rounded-full text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-900"
-              onClick={() => onOpenChange(false)}
-            >
-              <X className="h-5 w-5" />
-            </button>
-          </div>
-        ) : null}
-
         <div className="flex flex-wrap gap-2">
           <Badge variant="neutral">{event.status === 'completed' ? 'Wykonany' : 'Planowany'}</Badge>
           {urgency === 'overdue' ? <Badge variant="danger">Zaległy</Badge> : null}
@@ -157,6 +146,13 @@ export function ServiceEventDetail({ event, vehicle, open, onOpenChange, onEdit,
             <p>
               <span className="font-medium text-zinc-950">Warsztat:</span> {event.workshopName}
             </p>
+          ) : null}
+          {event.workshopLocation ? (
+            <div className="space-y-2 rounded-[24px] border border-zinc-200 bg-zinc-50 p-3 sm:p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-zinc-400">Lokalizacja</p>
+              <p className="text-sm text-zinc-700">{event.workshopLocation.address ?? event.workshopLocation.label}</p>
+              <GoogleMiniMap location={event.workshopLocation} apiKey={appConfig.googleMapsApiKey} />
+            </div>
           ) : null}
         </div>
 

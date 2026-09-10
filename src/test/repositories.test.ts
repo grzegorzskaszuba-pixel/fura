@@ -117,6 +117,39 @@ describe('Repositories', () => {
     ])
   })
 
+  it('persists selected workshop location', async () => {
+    const profile = await profileRepository.create({ username: 'repo-location', displayName: 'Repo Location' })
+    const vehicle = await vehicleRepository.create(profile.id, {
+      name: 'Toyota Corolla',
+      make: 'Toyota',
+      model: 'Corolla',
+    })
+
+    const event = await serviceEventRepository.create(profile.id, vehicle.id, {
+      status: 'completed',
+      category: 'repair',
+      title: 'Naprawa ukladu klimatyzacji',
+      workshopName: 'Moto Klima',
+      workshopLocation: {
+        placeId: 'sample-place-id',
+        label: 'Moto Klima',
+        address: 'ul. Testowa 1, Krakow',
+        lat: 50.06143,
+        lng: 19.93658,
+      },
+    })
+
+    const saved = await serviceEventRepository.getById(event.id)
+
+    expect(saved?.workshopLocation).toEqual({
+      placeId: 'sample-place-id',
+      label: 'Moto Klima',
+      address: 'ul. Testowa 1, Krakow',
+      lat: 50.06143,
+      lng: 19.93658,
+    })
+  })
+
   it('persists planned service recurrence settings', async () => {
     const profile = await profileRepository.create({ username: 'repo-planned', displayName: 'Repo Planned' })
     const vehicle = await vehicleRepository.create(profile.id, {

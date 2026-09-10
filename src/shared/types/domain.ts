@@ -57,6 +57,7 @@ export interface ServiceEvent {
   mileage?: number
   description?: string
   workshopName?: string
+  workshopLocation?: WorkshopLocation
   partsCost?: number
   laborCost?: number
   otherCost?: number
@@ -71,6 +72,14 @@ export interface ServiceEvent {
   recurrenceMileageInterval?: number
   createdAt: string
   updatedAt: string
+}
+
+export interface WorkshopLocation {
+  placeId: string
+  label: string
+  address?: string
+  lat: number
+  lng: number
 }
 
 export interface AppStateRecord {
@@ -129,6 +138,7 @@ export interface ServiceEventFormValues {
   mileage?: number
   description?: string
   workshopName?: string
+  workshopLocation?: WorkshopLocation
   partsCost?: number
   laborCost?: number
   otherCost?: number

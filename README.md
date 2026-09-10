@@ -92,7 +92,10 @@ Ustawienia środowiskowe:
 
 ```bash
 VITE_API_BASE_URL=/api
+VITE_GOOGLE_MAPS_API_KEY=twoj_klucz_google_maps
 ```
+
+`VITE_GOOGLE_MAPS_API_KEY` aktywuje podpowiedzi lokalizacji warsztatu oraz mini mapkę we wpisie serwisowym.
 
 `npm run dev` jest domyślną i zalecaną komendą deweloperską, uruchamia web + API i zapewnia spójne konto między urządzeniami.
 

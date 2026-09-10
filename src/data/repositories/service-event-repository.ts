@@ -19,6 +19,7 @@ function toServiceEventPayload(input: ServiceEventFormValues) {
     mileage: input.mileage,
     description: input.description?.trim(),
     workshopName: input.workshopName?.trim(),
+    workshopLocation: input.workshopLocation,
     partsCost: input.partsCost,
     laborCost: input.laborCost,
     otherCost: input.otherCost,

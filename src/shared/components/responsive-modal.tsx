@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { X } from 'lucide-react'
 
 import { useMediaQuery } from '@/shared/hooks/use-media-query'
 import {
@@ -10,6 +11,7 @@ import {
 } from '@/shared/components/ui/dialog'
 import {
   Drawer,
+  DrawerClose,
   DrawerContent,
   DrawerDescription,
   DrawerHeader,
@@ -38,7 +40,15 @@ export function ResponsiveModal({
       <Drawer open={open} onOpenChange={onOpenChange} fixed repositionInputs={false} handleOnly>
         <DrawerContent>
           <DrawerHeader>
-            <DrawerTitle>{title}</DrawerTitle>
+            <div className="flex items-start justify-between gap-3">
+              <DrawerTitle className="min-w-0 flex-1 pr-1">{title}</DrawerTitle>
+              <DrawerClose
+                aria-label="Zamknij"
+                className="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-900"
+              >
+                <X className="h-5 w-5" />
+              </DrawerClose>
+            </div>
             {description ? <DrawerDescription>{description}</DrawerDescription> : null}
           </DrawerHeader>
           <div className="-mx-1 min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-y-contain px-1 pb-2 touch-pan-y [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
@@ -52,7 +62,7 @@ export function ResponsiveModal({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
-        <DialogHeader>
+        <DialogHeader className="pr-12">
           <DialogTitle>{title}</DialogTitle>
           {description ? <DialogDescription>{description}</DialogDescription> : null}
         </DialogHeader>

@@ -319,6 +319,7 @@ export default function App() {
       mileage: event.mileage,
       description: event.description,
       workshopName: event.workshopName,
+      workshopLocation: event.workshopLocation,
       partsCost: event.partsCost,
       laborCost: event.laborCost,
       otherCost: event.otherCost,

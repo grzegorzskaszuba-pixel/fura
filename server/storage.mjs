@@ -308,6 +308,7 @@ async function ensureNormalizedPostgresStorage() {
         mileage INTEGER,
         description TEXT,
         workshop_name TEXT,
+        workshop_location JSONB,
         parts_cost NUMERIC,
         labor_cost NUMERIC,
         other_cost NUMERIC,
@@ -324,6 +325,8 @@ async function ensureNormalizedPostgresStorage() {
         updated_at TIMESTAMPTZ NOT NULL
       )
     `)
+
+    await pgPool.query('ALTER TABLE service_events ADD COLUMN IF NOT EXISTS workshop_location JSONB')
 
     await pgPool.query('CREATE INDEX IF NOT EXISTS service_events_profile_updated_idx ON service_events (profile_id, updated_at DESC)')
     await pgPool.query('CREATE INDEX IF NOT EXISTS service_events_vehicle_updated_idx ON service_events (vehicle_id, updated_at DESC)')
@@ -410,17 +413,17 @@ async function ensureNormalizedPostgresStorage() {
           `
             INSERT INTO service_events (
               id, profile_id, vehicle_id, status, category, title, event_date, mileage, description,
-              workshop_name, parts_cost, labor_cost, other_cost, currency, attachment_count,
+              workshop_name, workshop_location, parts_cost, labor_cost, other_cost, currency, attachment_count,
               attachment_names, attachments, is_recurring, recurrence_type,
               recurrence_interval_value, recurrence_interval_unit, recurrence_mileage_interval,
               created_at, updated_at
             )
             VALUES (
               $1, $2, $3, $4, $5, $6, $7, $8, $9,
-              $10, $11, $12, $13, $14, $15,
-              $16::jsonb, $17::jsonb, $18, $19,
-              $20, $21, $22,
-              $23, $24
+              $10, $11::jsonb, $12, $13, $14, $15, $16,
+              $17::jsonb, $18::jsonb, $19, $20,
+              $21, $22, $23,
+              $24, $25
             )
             ON CONFLICT (id) DO NOTHING
           `,
@@ -435,6 +438,7 @@ async function ensureNormalizedPostgresStorage() {
             event.mileage ?? null,
             event.description ?? null,
             event.workshopName ?? null,
+            event.workshopLocation ? JSON.stringify(event.workshopLocation) : null,
             event.partsCost ?? null,
             event.laborCost ?? null,
             event.otherCost ?? null,

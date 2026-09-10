@@ -215,6 +215,34 @@ function normalizeOptionalNumber(value) {
   return value
 }
 
+function normalizeWorkshopLocation(value) {
+  if (!value || typeof value !== 'object') {
+    return undefined
+  }
+
+  const placeId = normalizeOptionalString(value.placeId)
+  const label = normalizeOptionalString(value.label)
+  const address = normalizeOptionalString(value.address)
+  const lat = normalizeOptionalNumber(value.lat)
+  const lng = normalizeOptionalNumber(value.lng)
+
+  if (!placeId || !label || lat === undefined || lng === undefined) {
+    return undefined
+  }
+
+  if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+    return undefined
+  }
+
+  return {
+    placeId,
+    label,
+    address,
+    lat,
+    lng,
+  }
+}
+
 function sanitizeProfile(profile) {
   return {
     id: profile.id,
@@ -281,6 +309,7 @@ function mapServiceEventRow(row) {
     mileage: normalizeNumber(row.mileage),
     description: row.description ?? undefined,
     workshopName: row.workshop_name ?? undefined,
+    workshopLocation: normalizeWorkshopLocation(row.workshop_location),
     partsCost: normalizeNumber(row.parts_cost),
     laborCost: normalizeNumber(row.labor_cost),
     otherCost: normalizeNumber(row.other_cost),
@@ -363,6 +392,7 @@ function sanitizeServiceEventPayload(payload) {
     mileage: normalizeOptionalNumber(payload.mileage),
     description: normalizeOptionalString(payload.description),
     workshopName: normalizeOptionalString(payload.workshopName),
+    workshopLocation: normalizeWorkshopLocation(payload.workshopLocation),
     partsCost: normalizeOptionalNumber(payload.partsCost),
     laborCost: normalizeOptionalNumber(payload.laborCost),
     otherCost: normalizeOptionalNumber(payload.otherCost),
@@ -843,6 +873,7 @@ async function handleAuthRequest(request, response) {
       mileage: normalized.mileage,
       description: normalized.description,
       workshopName: normalized.workshopName,
+      workshopLocation: normalized.workshopLocation,
       partsCost: normalized.partsCost,
       laborCost: normalized.laborCost,
       otherCost: normalized.otherCost,
@@ -871,15 +902,15 @@ async function handleAuthRequest(request, response) {
         `
           INSERT INTO service_events (
             id, profile_id, vehicle_id, status, category, title, event_date, mileage, description,
-            workshop_name, parts_cost, labor_cost, other_cost, currency, attachment_count,
+            workshop_name, workshop_location, parts_cost, labor_cost, other_cost, currency, attachment_count,
             attachment_names, attachments, is_recurring, recurrence_type, recurrence_interval_value,
             recurrence_interval_unit, recurrence_mileage_interval, created_at, updated_at
           )
           VALUES (
             $1, $2, $3, $4, $5, $6, $7, $8, $9,
-            $10, $11, $12, $13, $14, $15,
-            $16::jsonb, $17::jsonb, $18, $19, $20,
-            $21, $22, $23, $24
+            $10, $11::jsonb, $12, $13, $14, $15, $16,
+            $17::jsonb, $18::jsonb, $19, $20, $21,
+            $22, $23, $24, $25
           )
           RETURNING *
         `,
@@ -894,6 +925,7 @@ async function handleAuthRequest(request, response) {
           event.mileage ?? null,
           event.description ?? null,
           event.workshopName ?? null,
+          event.workshopLocation ? JSON.stringify(event.workshopLocation) : null,
           event.partsCost ?? null,
           event.laborCost ?? null,
           event.otherCost ?? null,
@@ -962,20 +994,21 @@ async function handleAuthRequest(request, response) {
             mileage = $5,
             description = $6,
             workshop_name = $7,
-            parts_cost = $8,
-            labor_cost = $9,
-            other_cost = $10,
-            attachment_count = $11,
-            attachment_names = $12::jsonb,
-            attachments = $13::jsonb,
-            is_recurring = $14,
-            recurrence_type = $15,
-            recurrence_interval_value = $16,
-            recurrence_interval_unit = $17,
-            recurrence_mileage_interval = $18,
-            updated_at = $19,
+            workshop_location = $8::jsonb,
+            parts_cost = $9,
+            labor_cost = $10,
+            other_cost = $11,
+            attachment_count = $12,
+            attachment_names = $13::jsonb,
+            attachments = $14::jsonb,
+            is_recurring = $15,
+            recurrence_type = $16,
+            recurrence_interval_value = $17,
+            recurrence_interval_unit = $18,
+            recurrence_mileage_interval = $19,
+            updated_at = $20,
             currency = 'PLN'
-          WHERE id = $20 AND profile_id = $21
+          WHERE id = $21 AND profile_id = $22
           RETURNING *
         `,
         [
@@ -986,6 +1019,7 @@ async function handleAuthRequest(request, response) {
           normalized.mileage ?? null,
           normalized.description ?? null,
           normalized.workshopName ?? null,
+          normalized.workshopLocation ? JSON.stringify(normalized.workshopLocation) : null,
           normalized.partsCost ?? null,
           normalized.laborCost ?? null,
           normalized.otherCost ?? null,
@@ -1025,6 +1059,7 @@ async function handleAuthRequest(request, response) {
       mileage: normalized.mileage,
       description: normalized.description,
       workshopName: normalized.workshopName,
+      workshopLocation: normalized.workshopLocation,
       partsCost: normalized.partsCost,
       laborCost: normalized.laborCost,
       otherCost: normalized.otherCost,

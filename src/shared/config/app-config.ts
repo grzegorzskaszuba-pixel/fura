@@ -9,7 +9,13 @@ function readApiBaseUrl() {
   return value.length > 0 ? value : '/api'
 }
 
+function readGoogleMapsApiKey() {
+  const value = String(import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? '').trim()
+  return value.length > 0 ? value : undefined
+}
+
 export const appConfig = {
   authMode: readAuthMode(),
   apiBaseUrl: readApiBaseUrl(),
+  googleMapsApiKey: readGoogleMapsApiKey(),
 }

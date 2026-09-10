@@ -43,6 +43,7 @@
 - `mileage`
 - `description`
 - `workshopName`
+- `workshopLocation`
 - `partsCost`
 - `laborCost`
 - `otherCost`
