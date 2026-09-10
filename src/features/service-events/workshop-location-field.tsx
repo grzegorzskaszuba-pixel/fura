@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { GoogleMiniMap } from '@/shared/components/google-mini-map'
 import { appConfig } from '@/shared/config/app-config'
 import { Input } from '@/shared/components/ui/input'
-import { fetchGooglePlaceDetails, fetchGooglePlacePredictions, loadGoogleMapsPlaces } from '@/shared/lib/google-maps'
+import { fetchGooglePlaceDetails, fetchGooglePlacePredictions } from '@/shared/lib/google-maps'
 import type { WorkshopLocation } from '@/shared/types/domain'
 
 interface WorkshopLocationFieldProps {
@@ -22,7 +22,6 @@ export function WorkshopLocationField({
   const wrapperRef = useRef<HTMLDivElement | null>(null)
   const [predictions, setPredictions] = useState<Array<{ place_id: string; description: string }>>([])
   const [loading, setLoading] = useState(false)
-  const [mapsReady, setMapsReady] = useState(false)
   const [mapsError, setMapsError] = useState<string | null>(null)
   const [focused, setFocused] = useState(false)
   const apiKey = appConfig.googleMapsApiKey
@@ -30,37 +29,9 @@ export function WorkshopLocationField({
   const shouldShowSuggestions = focused && predictions.length > 0
 
   useEffect(() => {
-    let cancelled = false
-
-    async function prepareMaps() {
-      if (!apiKey) {
-        return
-      }
-
-      try {
-        await loadGoogleMapsPlaces(apiKey)
-
-        if (!cancelled) {
-          setMapsReady(true)
-          setMapsError(null)
-        }
-      } catch {
-        if (!cancelled) {
-          setMapsError('Nie udało się załadować Google Maps')
-        }
-      }
-    }
-
-    void prepareMaps()
-
-    return () => {
-      cancelled = true
-    }
-  }, [apiKey])
-
-  useEffect(() => {
-    if (!apiKey || !focused || !mapsReady || workshopName.trim().length < 3) {
+    if (!apiKey || !focused || workshopName.trim().length < 3) {
       setPredictions([])
+      setMapsError(null)
       return
     }
 
@@ -73,6 +44,12 @@ export function WorkshopLocationField({
 
         if (!cancelled) {
           setPredictions(nextPredictions)
+          setMapsError(null)
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setPredictions([])
+          setMapsError(error instanceof Error ? error.message : 'Nie udało się pobrać podpowiedzi lokalizacji')
         }
       } finally {
         if (!cancelled) {
@@ -85,7 +62,7 @@ export function WorkshopLocationField({
       cancelled = true
       window.clearTimeout(timeout)
     }
-  }, [apiKey, focused, mapsReady, workshopName])
+  }, [apiKey, focused, workshopName])
 
   useEffect(() => {
     function handleDocumentClick(event: MouseEvent) {
@@ -117,7 +94,15 @@ export function WorkshopLocationField({
       return
     }
 
-    const details = await fetchGooglePlaceDetails(apiKey, placeId)
+    let details: Awaited<ReturnType<typeof fetchGooglePlaceDetails>>
+
+    try {
+      details = await fetchGooglePlaceDetails(apiKey, placeId)
+      setMapsError(null)
+    } catch (error) {
+      setMapsError(error instanceof Error ? error.message : 'Nie udało się pobrać szczegółów lokalizacji')
+      return
+    }
 
     if (!details) {
       onWorkshopNameChange(description)
