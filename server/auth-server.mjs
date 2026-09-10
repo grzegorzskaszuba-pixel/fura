@@ -1162,7 +1162,77 @@ async function handleAuthRequest(request, response) {
         [username],
       )
 
-      const row = profileResult.rows[0]
+      let row = profileResult.rows[0]
+
+      if (!row) {
+        const legacyState = await readState()
+
+        try {
+          const legacyProfile = loginProfile(legacyState, payload)
+          const legacyCredential = legacyState.credentials.find((entry) => entry.profileId === legacyProfile.id)
+
+          if (legacyCredential) {
+            await postgresTransaction(async (client) => {
+              await client.query(
+                `
+                  INSERT INTO profiles (id, username, display_name, created_at, updated_at)
+                  VALUES ($1, $2, $3, $4, $5)
+                  ON CONFLICT (id) DO UPDATE
+                  SET username = EXCLUDED.username,
+                      display_name = EXCLUDED.display_name,
+                      updated_at = EXCLUDED.updated_at
+                `,
+                [legacyProfile.id, legacyProfile.username, legacyProfile.displayName, legacyProfile.createdAt, legacyProfile.updatedAt],
+              )
+
+              await client.query(
+                `
+                  INSERT INTO credentials (profile_id, username, password_hash, password_salt, created_at, updated_at)
+                  VALUES ($1, $2, $3, $4, $5, $6)
+                  ON CONFLICT (profile_id) DO UPDATE
+                  SET username = EXCLUDED.username,
+                      password_hash = EXCLUDED.password_hash,
+                      password_salt = EXCLUDED.password_salt,
+                      updated_at = EXCLUDED.updated_at
+                `,
+                [
+                  legacyCredential.profileId,
+                  legacyCredential.username,
+                  legacyCredential.passwordHash,
+                  legacyCredential.passwordSalt,
+                  legacyCredential.createdAt,
+                  legacyCredential.updatedAt,
+                ],
+              )
+            })
+
+            const refreshedResult = await postgresQuery(
+              `
+                SELECT
+                  p.id,
+                  p.username,
+                  p.display_name,
+                  p.created_at,
+                  p.updated_at,
+                  c.profile_id,
+                  c.password_hash,
+                  c.password_salt,
+                  c.created_at AS credential_created_at,
+                  c.updated_at AS credential_updated_at
+                FROM profiles p
+                JOIN credentials c ON c.profile_id = p.id
+                WHERE p.username = $1
+                LIMIT 1
+              `,
+              [username],
+            )
+
+            row = refreshedResult.rows[0]
+          }
+        } catch {
+          // Fallback attempt failed; standard error handling below will return a validation message.
+        }
+      }
 
       if (!row) {
         setJson(response, 400, { message: 'Nie znaleziono profilu o podanej nazwie użytkownika' })

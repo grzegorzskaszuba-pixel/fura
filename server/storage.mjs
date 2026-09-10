@@ -50,7 +50,7 @@ const pgPool = usePostgres
       connectionString: postgresUrl,
       ssl: resolvePostgresSsl(),
       max: Number(process.env.AUTH_DATABASE_POOL_MAX ?? 10),
-      connectionTimeoutMillis: Number(process.env.AUTH_DATABASE_CONNECTION_TIMEOUT_MS ?? 2500),
+      connectionTimeoutMillis: Number(process.env.AUTH_DATABASE_CONNECTION_TIMEOUT_MS ?? 6000),
       idleTimeoutMillis: Number(process.env.AUTH_DATABASE_IDLE_TIMEOUT_MS ?? 30000),
     })
   : null
@@ -141,10 +141,10 @@ function toStorageError(error) {
 }
 
 async function withPostgresRetry(operation) {
-  const maxAttempts = Number(process.env.AUTH_DATABASE_MAX_ATTEMPTS ?? 5)
+  const maxAttempts = Number(process.env.AUTH_DATABASE_MAX_ATTEMPTS ?? 3)
   const baseDelayMs = Number(process.env.AUTH_DATABASE_RETRY_DELAY_MS ?? 250)
   const maxDelayMs = Number(process.env.AUTH_DATABASE_RETRY_MAX_DELAY_MS ?? 5000)
-  const maxElapsedMs = Number(process.env.AUTH_DATABASE_RETRY_MAX_ELAPSED_MS ?? 7000)
+  const maxElapsedMs = Number(process.env.AUTH_DATABASE_RETRY_MAX_ELAPSED_MS ?? 9000)
   const startedAt = Date.now()
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
@@ -330,13 +330,6 @@ async function ensureNormalizedPostgresStorage() {
   })
 
   await withPostgresRetry(async () => {
-    const profileCountResult = await pgPool.query('SELECT COUNT(*)::int AS count FROM profiles')
-    const profileCount = profileCountResult.rows[0]?.count ?? 0
-
-    if (profileCount > 0) {
-      return
-    }
-
     await ensurePostgresStorage()
     const legacyResult = await pgPool.query('SELECT state FROM app_state WHERE id = 1 LIMIT 1')
     const legacyState = normalizeState(legacyResult.rows[0]?.state ?? emptyState)
