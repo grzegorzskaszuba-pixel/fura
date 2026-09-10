@@ -398,13 +398,11 @@ export function VehicleCarousel({ vehicles, activeVehicleId, onVehicleSelect }: 
                   onTouchCancel={handleVinTouchCancel}
                   onContextMenu={(event) => event.preventDefault()}
                 >
+                  <span
+                    className="pointer-events-none absolute inset-0 origin-left bg-primary/85"
+                    style={{ transform: `scaleX(${vinHoldProgress})` }}
+                  />
                   <span className="relative z-10">{activeVehicle.vin}</span>
-                  <span className="pointer-events-none absolute inset-x-0 bottom-0 h-[2px] bg-zinc-300/40">
-                    <span
-                      className="absolute inset-0 origin-left bg-zinc-700/55"
-                      style={{ transform: `scaleX(${vinHoldProgress})` }}
-                    />
-                  </span>
                 </button>
                 <span
                   className={cn(
@@ -420,7 +418,7 @@ export function VehicleCarousel({ vehicles, activeVehicleId, onVehicleSelect }: 
               </div>
             ) : null}
             {activeVehicle.registrationNumber ? (
-              <div className="flex justify-center">
+              <div className={cn('flex justify-center', activeVehicle.vin ? 'mt-[3px]' : '')}>
                 <span className="inline-flex min-h-10 items-stretch overflow-hidden rounded-[0.7rem] border border-zinc-300 bg-white shadow-[0_10px_22px_rgba(15,23,42,0.08)] ring-1 ring-zinc-950/5">
                   <span className="flex w-8 shrink-0 items-center justify-center bg-[#0b4ea2] px-1 text-white">
                     <span className="text-[9px] font-semibold leading-none tracking-[0.2em]">PL</span>
