@@ -21,11 +21,15 @@ services:
       - key: AUTH_COOKIE_SECURE
         value: "true"
       - key: AUTH_DATABASE_MAX_ATTEMPTS
-        value: "8"
+        value: "5"
       - key: AUTH_DATABASE_RETRY_DELAY_MS
         value: "250"
       - key: AUTH_DATABASE_RETRY_MAX_DELAY_MS
         value: "5000"
+      - key: AUTH_DATABASE_RETRY_MAX_ELAPSED_MS
+        value: "7000"
+      - key: AUTH_DATABASE_CONNECTION_TIMEOUT_MS
+        value: "2500"
       - key: DATABASE_URL
         fromDatabase:
           name: fura-db

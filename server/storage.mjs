@@ -50,12 +50,13 @@ const pgPool = usePostgres
       connectionString: postgresUrl,
       ssl: resolvePostgresSsl(),
       max: Number(process.env.AUTH_DATABASE_POOL_MAX ?? 10),
-      connectionTimeoutMillis: Number(process.env.AUTH_DATABASE_CONNECTION_TIMEOUT_MS ?? 10000),
+      connectionTimeoutMillis: Number(process.env.AUTH_DATABASE_CONNECTION_TIMEOUT_MS ?? 2500),
       idleTimeoutMillis: Number(process.env.AUTH_DATABASE_IDLE_TIMEOUT_MS ?? 30000),
     })
   : null
 
 let pgInitialized = false
+let normalizedInitialized = false
 
 export class StorageError extends Error {
   constructor(message, options = {}) {
@@ -140,23 +141,32 @@ function toStorageError(error) {
 }
 
 async function withPostgresRetry(operation) {
-  const maxAttempts = Number(process.env.AUTH_DATABASE_MAX_ATTEMPTS ?? 8)
+  const maxAttempts = Number(process.env.AUTH_DATABASE_MAX_ATTEMPTS ?? 5)
   const baseDelayMs = Number(process.env.AUTH_DATABASE_RETRY_DELAY_MS ?? 250)
   const maxDelayMs = Number(process.env.AUTH_DATABASE_RETRY_MAX_DELAY_MS ?? 5000)
+  const maxElapsedMs = Number(process.env.AUTH_DATABASE_RETRY_MAX_ELAPSED_MS ?? 7000)
+  const startedAt = Date.now()
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     try {
       return await operation()
     } catch (error) {
       const transient = isTransientPostgresError(error)
+      const elapsedMs = Date.now() - startedAt
 
-      if (!transient || attempt === maxAttempts) {
+      if (!transient || attempt === maxAttempts || elapsedMs >= maxElapsedMs) {
         throw toStorageError(error)
       }
 
       const exponential = baseDelayMs * 2 ** (attempt - 1)
       const jitter = Math.floor(Math.random() * Math.max(25, Math.floor(baseDelayMs / 2)))
-      const delayMs = Math.min(maxDelayMs, exponential + jitter)
+      const remainingMs = Math.max(0, maxElapsedMs - elapsedMs)
+      const delayMs = Math.min(maxDelayMs, exponential + jitter, remainingMs)
+
+      if (delayMs <= 0) {
+        throw toStorageError(error)
+      }
+
       await wait(delayMs)
     }
   }
@@ -222,6 +232,282 @@ async function ensurePostgresStorage() {
     await pgPool.query('INSERT INTO app_state (id, state) VALUES (1, $1::jsonb) ON CONFLICT (id) DO NOTHING', [JSON.stringify(emptyState)])
     pgInitialized = true
   })
+}
+
+async function ensureNormalizedPostgresStorage() {
+  if (!pgPool) {
+    throw new Error('Postgres storage is not initialized')
+  }
+
+  if (!postgresUrl) {
+    throw new Error('Brak konfiguracji bazy PostgreSQL: ustaw DATABASE_URL lub AUTH_DATABASE_URL')
+  }
+
+  if (normalizedInitialized) {
+    return
+  }
+
+  await withPostgresRetry(async () => {
+    await pgPool.query(`
+      CREATE TABLE IF NOT EXISTS profiles (
+        id UUID PRIMARY KEY,
+        username TEXT UNIQUE NOT NULL,
+        display_name TEXT NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL,
+        updated_at TIMESTAMPTZ NOT NULL
+      )
+    `)
+
+    await pgPool.query(`
+      CREATE TABLE IF NOT EXISTS credentials (
+        profile_id UUID PRIMARY KEY REFERENCES profiles(id) ON DELETE CASCADE,
+        username TEXT UNIQUE NOT NULL,
+        password_hash TEXT NOT NULL,
+        password_salt TEXT NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL,
+        updated_at TIMESTAMPTZ NOT NULL
+      )
+    `)
+
+    await pgPool.query(`
+      CREATE TABLE IF NOT EXISTS vehicles (
+        id UUID PRIMARY KEY,
+        profile_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        make TEXT NOT NULL,
+        model TEXT NOT NULL,
+        year INTEGER,
+        body_type TEXT,
+        fuel_type TEXT,
+        transmission TEXT,
+        engine TEXT,
+        power INTEGER,
+        color TEXT,
+        vin TEXT,
+        registration_number TEXT,
+        current_mileage INTEGER,
+        image_url TEXT,
+        notes TEXT,
+        archived BOOLEAN NOT NULL DEFAULT FALSE,
+        created_at TIMESTAMPTZ NOT NULL,
+        updated_at TIMESTAMPTZ NOT NULL
+      )
+    `)
+
+    await pgPool.query('CREATE INDEX IF NOT EXISTS vehicles_profile_updated_idx ON vehicles (profile_id, updated_at DESC)')
+
+    await pgPool.query(`
+      CREATE TABLE IF NOT EXISTS service_events (
+        id UUID PRIMARY KEY,
+        profile_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+        vehicle_id UUID NOT NULL REFERENCES vehicles(id) ON DELETE CASCADE,
+        status TEXT NOT NULL,
+        category TEXT NOT NULL,
+        title TEXT NOT NULL,
+        event_date TEXT,
+        mileage INTEGER,
+        description TEXT,
+        workshop_name TEXT,
+        parts_cost NUMERIC,
+        labor_cost NUMERIC,
+        other_cost NUMERIC,
+        currency TEXT NOT NULL DEFAULT 'PLN',
+        attachment_count INTEGER,
+        attachment_names JSONB,
+        attachments JSONB,
+        is_recurring BOOLEAN,
+        recurrence_type TEXT,
+        recurrence_interval_value INTEGER,
+        recurrence_interval_unit TEXT,
+        recurrence_mileage_interval INTEGER,
+        created_at TIMESTAMPTZ NOT NULL,
+        updated_at TIMESTAMPTZ NOT NULL
+      )
+    `)
+
+    await pgPool.query('CREATE INDEX IF NOT EXISTS service_events_profile_updated_idx ON service_events (profile_id, updated_at DESC)')
+    await pgPool.query('CREATE INDEX IF NOT EXISTS service_events_vehicle_updated_idx ON service_events (vehicle_id, updated_at DESC)')
+  })
+
+  await withPostgresRetry(async () => {
+    const profileCountResult = await pgPool.query('SELECT COUNT(*)::int AS count FROM profiles')
+    const profileCount = profileCountResult.rows[0]?.count ?? 0
+
+    if (profileCount > 0) {
+      return
+    }
+
+    await ensurePostgresStorage()
+    const legacyResult = await pgPool.query('SELECT state FROM app_state WHERE id = 1 LIMIT 1')
+    const legacyState = normalizeState(legacyResult.rows[0]?.state ?? emptyState)
+
+    if (legacyState.profiles.length === 0 && legacyState.credentials.length === 0 && legacyState.vehicles.length === 0 && legacyState.serviceEvents.length === 0) {
+      return
+    }
+
+    const client = await pgPool.connect()
+
+    try {
+      await client.query('BEGIN')
+
+      for (const profile of legacyState.profiles) {
+        await client.query(
+          `
+            INSERT INTO profiles (id, username, display_name, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, $5)
+            ON CONFLICT (id) DO NOTHING
+          `,
+          [profile.id, profile.username, profile.displayName, profile.createdAt, profile.updatedAt],
+        )
+      }
+
+      for (const credential of legacyState.credentials) {
+        await client.query(
+          `
+            INSERT INTO credentials (profile_id, username, password_hash, password_salt, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, $5, $6)
+            ON CONFLICT (profile_id) DO NOTHING
+          `,
+          [credential.profileId, credential.username, credential.passwordHash, credential.passwordSalt, credential.createdAt, credential.updatedAt],
+        )
+      }
+
+      for (const vehicle of legacyState.vehicles) {
+        await client.query(
+          `
+            INSERT INTO vehicles (
+              id, profile_id, name, make, model, year, body_type, fuel_type, transmission,
+              engine, power, color, vin, registration_number, current_mileage, image_url,
+              notes, archived, created_at, updated_at
+            )
+            VALUES (
+              $1, $2, $3, $4, $5, $6, $7, $8, $9,
+              $10, $11, $12, $13, $14, $15, $16,
+              $17, $18, $19, $20
+            )
+            ON CONFLICT (id) DO NOTHING
+          `,
+          [
+            vehicle.id,
+            vehicle.profileId,
+            vehicle.name,
+            vehicle.make,
+            vehicle.model,
+            vehicle.year ?? null,
+            vehicle.bodyType ?? null,
+            vehicle.fuelType ?? null,
+            vehicle.transmission ?? null,
+            vehicle.engine ?? null,
+            vehicle.power ?? null,
+            vehicle.color ?? null,
+            vehicle.vin ?? null,
+            vehicle.registrationNumber ?? null,
+            vehicle.currentMileage ?? null,
+            vehicle.imageUrl ?? null,
+            vehicle.notes ?? null,
+            Boolean(vehicle.archived),
+            vehicle.createdAt,
+            vehicle.updatedAt,
+          ],
+        )
+      }
+
+      for (const event of legacyState.serviceEvents) {
+        await client.query(
+          `
+            INSERT INTO service_events (
+              id, profile_id, vehicle_id, status, category, title, event_date, mileage, description,
+              workshop_name, parts_cost, labor_cost, other_cost, currency, attachment_count,
+              attachment_names, attachments, is_recurring, recurrence_type,
+              recurrence_interval_value, recurrence_interval_unit, recurrence_mileage_interval,
+              created_at, updated_at
+            )
+            VALUES (
+              $1, $2, $3, $4, $5, $6, $7, $8, $9,
+              $10, $11, $12, $13, $14, $15,
+              $16::jsonb, $17::jsonb, $18, $19,
+              $20, $21, $22,
+              $23, $24
+            )
+            ON CONFLICT (id) DO NOTHING
+          `,
+          [
+            event.id,
+            event.profileId,
+            event.vehicleId,
+            event.status,
+            event.category,
+            event.title,
+            event.eventDate ?? null,
+            event.mileage ?? null,
+            event.description ?? null,
+            event.workshopName ?? null,
+            event.partsCost ?? null,
+            event.laborCost ?? null,
+            event.otherCost ?? null,
+            event.currency ?? 'PLN',
+            event.attachmentCount ?? null,
+            event.attachmentNames ? JSON.stringify(event.attachmentNames) : null,
+            event.attachments ? JSON.stringify(event.attachments) : null,
+            event.isRecurring ?? null,
+            event.recurrenceType ?? null,
+            event.recurrenceIntervalValue ?? null,
+            event.recurrenceIntervalUnit ?? null,
+            event.recurrenceMileageInterval ?? null,
+            event.createdAt,
+            event.updatedAt,
+          ],
+        )
+      }
+
+      await client.query('COMMIT')
+    } catch (error) {
+      await client.query('ROLLBACK')
+      throw error
+    } finally {
+      client.release()
+    }
+  })
+
+  normalizedInitialized = true
+}
+
+export function isPostgresStorage() {
+  return usePostgres
+}
+
+export async function postgresQuery(queryText, params = []) {
+  if (!pgPool) {
+    throw new StorageError('Postgres storage is not initialized')
+  }
+
+  try {
+    await ensureNormalizedPostgresStorage()
+    return await withPostgresRetry(() => pgPool.query(queryText, params))
+  } catch (error) {
+    throw toStorageError(error)
+  }
+}
+
+export async function postgresTransaction(callback) {
+  if (!pgPool) {
+    throw new StorageError('Postgres storage is not initialized')
+  }
+
+  await ensureNormalizedPostgresStorage()
+  const client = await pgPool.connect()
+
+  try {
+    await client.query('BEGIN')
+    const result = await callback(client)
+    await client.query('COMMIT')
+    return result
+  } catch (error) {
+    await client.query('ROLLBACK')
+    throw toStorageError(error)
+  } finally {
+    client.release()
+  }
 }
 
 async function readStatePostgres() {

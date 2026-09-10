@@ -9,7 +9,7 @@ import {
   registerProfile,
   resetPassword,
 } from './auth-core.mjs'
-import { StorageError, readState, writeState } from './storage.mjs'
+import { StorageError, isPostgresStorage, postgresQuery, postgresTransaction, readState, writeState } from './storage.mjs'
 
 const PORT = Number(process.env.AUTH_API_PORT ?? process.env.PORT ?? 8787)
 const HOST = process.env.AUTH_API_HOST ?? '0.0.0.0'
@@ -225,6 +225,79 @@ function sanitizeProfile(profile) {
   }
 }
 
+function normalizeNumber(value) {
+  if (value === null || value === undefined) {
+    return undefined
+  }
+
+  const parsed = Number(value)
+  return Number.isNaN(parsed) ? undefined : parsed
+}
+
+function mapProfileRow(row) {
+  return {
+    id: row.id,
+    username: row.username,
+    displayName: row.display_name,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }
+}
+
+function mapVehicleRow(row) {
+  return {
+    id: row.id,
+    profileId: row.profile_id,
+    name: row.name,
+    make: row.make,
+    model: row.model,
+    year: normalizeNumber(row.year),
+    bodyType: row.body_type ?? undefined,
+    fuelType: row.fuel_type ?? undefined,
+    transmission: row.transmission ?? undefined,
+    engine: row.engine ?? undefined,
+    power: normalizeNumber(row.power),
+    color: row.color ?? undefined,
+    vin: row.vin ?? undefined,
+    registrationNumber: row.registration_number ?? undefined,
+    currentMileage: normalizeNumber(row.current_mileage),
+    imageUrl: row.image_url ?? undefined,
+    notes: row.notes ?? undefined,
+    archived: Boolean(row.archived),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }
+}
+
+function mapServiceEventRow(row) {
+  return {
+    id: row.id,
+    profileId: row.profile_id,
+    vehicleId: row.vehicle_id,
+    status: row.status,
+    category: row.category,
+    title: row.title,
+    eventDate: row.event_date ?? undefined,
+    mileage: normalizeNumber(row.mileage),
+    description: row.description ?? undefined,
+    workshopName: row.workshop_name ?? undefined,
+    partsCost: normalizeNumber(row.parts_cost),
+    laborCost: normalizeNumber(row.labor_cost),
+    otherCost: normalizeNumber(row.other_cost),
+    currency: row.currency,
+    attachmentCount: normalizeNumber(row.attachment_count),
+    attachmentNames: Array.isArray(row.attachment_names) ? row.attachment_names : undefined,
+    attachments: Array.isArray(row.attachments) ? row.attachments : undefined,
+    isRecurring: typeof row.is_recurring === 'boolean' ? row.is_recurring : undefined,
+    recurrenceType: row.recurrence_type ?? undefined,
+    recurrenceIntervalValue: normalizeNumber(row.recurrence_interval_value),
+    recurrenceIntervalUnit: row.recurrence_interval_unit ?? undefined,
+    recurrenceMileageInterval: normalizeNumber(row.recurrence_mileage_interval),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }
+}
+
 function sanitizeVehiclePayload(payload) {
   const normalizedName = String(payload.name ?? '').trim()
   const normalizedMake = String(payload.make ?? '').trim()
@@ -352,6 +425,12 @@ async function handleAuthRequest(request, response) {
       return
     }
 
+    if (isPostgresStorage()) {
+      const result = await postgresQuery('SELECT * FROM vehicles WHERE profile_id = $1 AND archived = FALSE ORDER BY updated_at DESC', [profileId])
+      setJson(response, 200, { vehicles: result.rows.map(mapVehicleRow) })
+      return
+    }
+
     const state = await readState()
     const vehicles = state.vehicles
       .filter((vehicle) => vehicle.profileId === profileId && !vehicle.archived)
@@ -366,6 +445,23 @@ async function handleAuthRequest(request, response) {
 
     if (!profileId) {
       setJson(response, 200, { profiles: [] })
+      return
+    }
+
+    if (isPostgresStorage()) {
+      const result = await postgresQuery(
+        'SELECT id, username, display_name, created_at, updated_at FROM profiles WHERE id = $1 LIMIT 1',
+        [profileId],
+      )
+
+      const currentProfileRow = result.rows[0]
+
+      if (!currentProfileRow) {
+        setJson(response, 401, { message: 'Brak aktywnej sesji profilu' })
+        return
+      }
+
+      setJson(response, 200, { profiles: [mapProfileRow(currentProfileRow)] })
       return
     }
 
@@ -404,6 +500,29 @@ async function handleAuthRequest(request, response) {
       return
     }
 
+    if (isPostgresStorage()) {
+      const updatedAt = new Date().toISOString()
+      const result = await postgresQuery(
+        `
+          UPDATE profiles
+          SET display_name = $1, updated_at = $2
+          WHERE id = $3
+          RETURNING id, username, display_name, created_at, updated_at
+        `,
+        [displayName, updatedAt, profileId],
+      )
+
+      const row = result.rows[0]
+
+      if (!row) {
+        setJson(response, 404, { message: 'Profil nie istnieje' })
+        return
+      }
+
+      setJson(response, 200, { profile: mapProfileRow(row) })
+      return
+    }
+
     const state = await readState()
     const profile = state.profiles.find((entry) => entry.id === profileId)
 
@@ -428,7 +547,6 @@ async function handleAuthRequest(request, response) {
       return
     }
 
-    const state = await readState()
     const payload = await readJsonBody(request)
     const now = new Date().toISOString()
     const normalized = sanitizeVehiclePayload(payload)
@@ -439,6 +557,51 @@ async function handleAuthRequest(request, response) {
       createdAt: now,
       updatedAt: now,
     }
+
+    if (isPostgresStorage()) {
+      const result = await postgresQuery(
+        `
+          INSERT INTO vehicles (
+            id, profile_id, name, make, model, year, body_type, fuel_type, transmission,
+            engine, power, color, vin, registration_number, current_mileage, image_url,
+            notes, archived, created_at, updated_at
+          )
+          VALUES (
+            $1, $2, $3, $4, $5, $6, $7, $8, $9,
+            $10, $11, $12, $13, $14, $15, $16,
+            $17, $18, $19, $20
+          )
+          RETURNING *
+        `,
+        [
+          vehicle.id,
+          vehicle.profileId,
+          vehicle.name,
+          vehicle.make,
+          vehicle.model,
+          vehicle.year ?? null,
+          vehicle.bodyType ?? null,
+          vehicle.fuelType ?? null,
+          vehicle.transmission ?? null,
+          vehicle.engine ?? null,
+          vehicle.power ?? null,
+          vehicle.color ?? null,
+          vehicle.vin ?? null,
+          vehicle.registrationNumber ?? null,
+          vehicle.currentMileage ?? null,
+          vehicle.imageUrl ?? null,
+          vehicle.notes ?? null,
+          Boolean(vehicle.archived),
+          vehicle.createdAt,
+          vehicle.updatedAt,
+        ],
+      )
+
+      setJson(response, 200, { vehicle: mapVehicleRow(result.rows[0]) })
+      return
+    }
+
+    const state = await readState()
 
     state.vehicles.push(vehicle)
     await writeState(state)
@@ -454,17 +617,77 @@ async function handleAuthRequest(request, response) {
       return
     }
 
-    const state = await readState()
     const vehicleId = pathname.slice('/api/vehicles/'.length)
+    const payload = await readJsonBody(request)
+    const normalized = sanitizeVehiclePayload(payload)
+
+    if (isPostgresStorage()) {
+      const updatedAt = new Date().toISOString()
+      const result = await postgresQuery(
+        `
+          UPDATE vehicles
+          SET
+            name = $1,
+            make = $2,
+            model = $3,
+            year = $4,
+            body_type = $5,
+            fuel_type = $6,
+            transmission = $7,
+            engine = $8,
+            power = $9,
+            color = $10,
+            vin = $11,
+            registration_number = $12,
+            current_mileage = $13,
+            image_url = $14,
+            notes = $15,
+            archived = $16,
+            updated_at = $17
+          WHERE id = $18 AND profile_id = $19
+          RETURNING *
+        `,
+        [
+          normalized.name,
+          normalized.make,
+          normalized.model,
+          normalized.year ?? null,
+          normalized.bodyType ?? null,
+          normalized.fuelType ?? null,
+          normalized.transmission ?? null,
+          normalized.engine ?? null,
+          normalized.power ?? null,
+          normalized.color ?? null,
+          normalized.vin ?? null,
+          normalized.registrationNumber ?? null,
+          normalized.currentMileage ?? null,
+          normalized.imageUrl ?? null,
+          normalized.notes ?? null,
+          Boolean(normalized.archived),
+          updatedAt,
+          vehicleId,
+          profileId,
+        ],
+      )
+
+      const row = result.rows[0]
+
+      if (!row) {
+        setJson(response, 404, { message: 'Vehicle not found' })
+        return
+      }
+
+      setJson(response, 200, { vehicle: mapVehicleRow(row) })
+      return
+    }
+
+    const state = await readState()
     const vehicle = state.vehicles.find((entry) => entry.id === vehicleId)
 
     if (!vehicle || vehicle.profileId !== profileId) {
       setJson(response, 404, { message: 'Vehicle not found' })
       return
     }
-
-    const payload = await readJsonBody(request)
-    const normalized = sanitizeVehiclePayload(payload)
 
     Object.assign(vehicle, normalized, { updatedAt: new Date().toISOString() })
     await writeState(state)
@@ -480,8 +703,21 @@ async function handleAuthRequest(request, response) {
       return
     }
 
-    const state = await readState()
     const vehicleId = pathname.slice('/api/vehicles/'.length)
+
+    if (isPostgresStorage()) {
+      const result = await postgresQuery('DELETE FROM vehicles WHERE id = $1 AND profile_id = $2 RETURNING id', [vehicleId, profileId])
+
+      if (!result.rows[0]) {
+        setJson(response, 404, { message: 'Vehicle not found' })
+        return
+      }
+
+      setJson(response, 200, { ok: true })
+      return
+    }
+
+    const state = await readState()
     const existing = state.vehicles.find((entry) => entry.id === vehicleId)
 
     if (!existing || existing.profileId !== profileId) {
@@ -511,6 +747,23 @@ async function handleAuthRequest(request, response) {
       return
     }
 
+    if (isPostgresStorage()) {
+      const vehicleResult = await postgresQuery('SELECT id FROM vehicles WHERE id = $1 AND profile_id = $2 LIMIT 1', [vehicleId, profileId])
+
+      if (!vehicleResult.rows[0]) {
+        setJson(response, 404, { message: 'Vehicle not found' })
+        return
+      }
+
+      const eventsResult = await postgresQuery(
+        'SELECT * FROM service_events WHERE profile_id = $1 AND vehicle_id = $2 ORDER BY updated_at DESC',
+        [profileId, vehicleId],
+      )
+
+      setJson(response, 200, { events: eventsResult.rows.map(mapServiceEventRow) })
+      return
+    }
+
     const state = await readState()
     const vehicle = state.vehicles.find((entry) => entry.id === vehicleId)
 
@@ -535,8 +788,22 @@ async function handleAuthRequest(request, response) {
       return
     }
 
-    const state = await readState()
     const eventId = pathname.slice('/api/service-events/'.length)
+
+    if (isPostgresStorage()) {
+      const result = await postgresQuery('SELECT * FROM service_events WHERE id = $1 AND profile_id = $2 LIMIT 1', [eventId, profileId])
+      const row = result.rows[0]
+
+      if (!row) {
+        setJson(response, 404, { message: 'Service event not found' })
+        return
+      }
+
+      setJson(response, 200, { event: mapServiceEventRow(row) })
+      return
+    }
+
+    const state = await readState()
     const event = state.serviceEvents.find((entry) => entry.id === eventId)
 
     if (!event || event.profileId !== profileId) {
@@ -556,19 +823,11 @@ async function handleAuthRequest(request, response) {
       return
     }
 
-    const state = await readState()
     const payload = await readJsonBody(request)
     const normalized = sanitizeServiceEventPayload(payload)
 
     if (!normalized.vehicleId) {
       setJson(response, 400, { message: 'Brak vehicleId' })
-      return
-    }
-
-    const vehicle = state.vehicles.find((entry) => entry.id === normalized.vehicleId)
-
-    if (!vehicle || vehicle.profileId !== profileId) {
-      setJson(response, 404, { message: 'Vehicle not found' })
       return
     }
 
@@ -600,6 +859,70 @@ async function handleAuthRequest(request, response) {
       updatedAt: now,
     }
 
+    if (isPostgresStorage()) {
+      const vehicleResult = await postgresQuery('SELECT id FROM vehicles WHERE id = $1 AND profile_id = $2 LIMIT 1', [normalized.vehicleId, profileId])
+
+      if (!vehicleResult.rows[0]) {
+        setJson(response, 404, { message: 'Vehicle not found' })
+        return
+      }
+
+      const inserted = await postgresQuery(
+        `
+          INSERT INTO service_events (
+            id, profile_id, vehicle_id, status, category, title, event_date, mileage, description,
+            workshop_name, parts_cost, labor_cost, other_cost, currency, attachment_count,
+            attachment_names, attachments, is_recurring, recurrence_type, recurrence_interval_value,
+            recurrence_interval_unit, recurrence_mileage_interval, created_at, updated_at
+          )
+          VALUES (
+            $1, $2, $3, $4, $5, $6, $7, $8, $9,
+            $10, $11, $12, $13, $14, $15,
+            $16::jsonb, $17::jsonb, $18, $19, $20,
+            $21, $22, $23, $24
+          )
+          RETURNING *
+        `,
+        [
+          event.id,
+          event.profileId,
+          event.vehicleId,
+          event.status,
+          event.category,
+          event.title,
+          event.eventDate ?? null,
+          event.mileage ?? null,
+          event.description ?? null,
+          event.workshopName ?? null,
+          event.partsCost ?? null,
+          event.laborCost ?? null,
+          event.otherCost ?? null,
+          event.currency,
+          event.attachmentCount ?? null,
+          event.attachmentNames ? JSON.stringify(event.attachmentNames) : null,
+          event.attachments ? JSON.stringify(event.attachments) : null,
+          event.isRecurring ?? null,
+          event.recurrenceType ?? null,
+          event.recurrenceIntervalValue ?? null,
+          event.recurrenceIntervalUnit ?? null,
+          event.recurrenceMileageInterval ?? null,
+          event.createdAt,
+          event.updatedAt,
+        ],
+      )
+
+      setJson(response, 200, { event: mapServiceEventRow(inserted.rows[0]) })
+      return
+    }
+
+    const state = await readState()
+    const vehicle = state.vehicles.find((entry) => entry.id === normalized.vehicleId)
+
+    if (!vehicle || vehicle.profileId !== profileId) {
+      setJson(response, 404, { message: 'Vehicle not found' })
+      return
+    }
+
     state.serviceEvents.push(event)
     await writeState(state)
     setJson(response, 200, { event })
@@ -614,8 +937,77 @@ async function handleAuthRequest(request, response) {
       return
     }
 
-    const state = await readState()
     const eventId = pathname.slice('/api/service-events/'.length)
+    const payload = await readJsonBody(request)
+
+    if (isPostgresStorage()) {
+      const existingResult = await postgresQuery('SELECT * FROM service_events WHERE id = $1 AND profile_id = $2 LIMIT 1', [eventId, profileId])
+      const existingRow = existingResult.rows[0]
+
+      if (!existingRow) {
+        setJson(response, 404, { message: 'Service event not found' })
+        return
+      }
+
+      const normalized = sanitizeServiceEventPayload({ ...payload, vehicleId: existingRow.vehicle_id })
+      const updatedAt = new Date().toISOString()
+      const updatedResult = await postgresQuery(
+        `
+          UPDATE service_events
+          SET
+            status = $1,
+            category = $2,
+            title = $3,
+            event_date = $4,
+            mileage = $5,
+            description = $6,
+            workshop_name = $7,
+            parts_cost = $8,
+            labor_cost = $9,
+            other_cost = $10,
+            attachment_count = $11,
+            attachment_names = $12::jsonb,
+            attachments = $13::jsonb,
+            is_recurring = $14,
+            recurrence_type = $15,
+            recurrence_interval_value = $16,
+            recurrence_interval_unit = $17,
+            recurrence_mileage_interval = $18,
+            updated_at = $19,
+            currency = 'PLN'
+          WHERE id = $20 AND profile_id = $21
+          RETURNING *
+        `,
+        [
+          normalized.status,
+          normalized.category,
+          normalized.title,
+          normalized.eventDate ?? null,
+          normalized.mileage ?? null,
+          normalized.description ?? null,
+          normalized.workshopName ?? null,
+          normalized.partsCost ?? null,
+          normalized.laborCost ?? null,
+          normalized.otherCost ?? null,
+          normalized.attachmentCount ?? null,
+          normalized.attachmentNames ? JSON.stringify(normalized.attachmentNames) : null,
+          normalized.attachments ? JSON.stringify(normalized.attachments) : null,
+          normalized.isRecurring ?? null,
+          normalized.recurrenceType ?? null,
+          normalized.recurrenceIntervalValue ?? null,
+          normalized.recurrenceIntervalUnit ?? null,
+          normalized.recurrenceMileageInterval ?? null,
+          updatedAt,
+          eventId,
+          profileId,
+        ],
+      )
+
+      setJson(response, 200, { event: mapServiceEventRow(updatedResult.rows[0]) })
+      return
+    }
+
+    const state = await readState()
     const event = state.serviceEvents.find((entry) => entry.id === eventId)
 
     if (!event || event.profileId !== profileId) {
@@ -623,7 +1015,6 @@ async function handleAuthRequest(request, response) {
       return
     }
 
-    const payload = await readJsonBody(request)
     const normalized = sanitizeServiceEventPayload({ ...payload, vehicleId: event.vehicleId })
 
     Object.assign(event, {
@@ -662,8 +1053,21 @@ async function handleAuthRequest(request, response) {
       return
     }
 
-    const state = await readState()
     const eventId = pathname.slice('/api/service-events/'.length)
+
+    if (isPostgresStorage()) {
+      const result = await postgresQuery('DELETE FROM service_events WHERE id = $1 AND profile_id = $2 RETURNING id', [eventId, profileId])
+
+      if (!result.rows[0]) {
+        setJson(response, 404, { message: 'Service event not found' })
+        return
+      }
+
+      setJson(response, 200, { ok: true })
+      return
+    }
+
+    const state = await readState()
     const existing = state.serviceEvents.find((entry) => entry.id === eventId)
 
     if (!existing || existing.profileId !== profileId) {
@@ -677,10 +1081,52 @@ async function handleAuthRequest(request, response) {
     return
   }
 
-  const state = await readState()
-
   if (pathname === '/api/auth/register' && method === 'POST') {
     const payload = await readJsonBody(request)
+
+    if (isPostgresStorage()) {
+      const username = String(payload.username ?? '').trim().toLowerCase()
+      const password = String(payload.password ?? '')
+
+      if (username.length < 2) {
+        setJson(response, 400, { message: 'Podaj nazwę użytkownika' })
+        return
+      }
+
+      if (password.length < 6) {
+        setJson(response, 400, { message: 'Hasło musi mieć co najmniej 6 znaków' })
+        return
+      }
+
+      const existing = await postgresQuery('SELECT id FROM profiles WHERE username = $1 LIMIT 1', [username])
+
+      if (existing.rows[0]) {
+        setJson(response, 400, { message: 'Taki profil już istnieje' })
+        return
+      }
+
+      const localState = { profiles: [], credentials: [], vehicles: [], serviceEvents: [] }
+      const profile = registerProfile(localState, payload)
+      const credential = localState.credentials[0]
+
+      await postgresTransaction(async (client) => {
+        await client.query(
+          'INSERT INTO profiles (id, username, display_name, created_at, updated_at) VALUES ($1, $2, $3, $4, $5)',
+          [profile.id, profile.username, profile.displayName, profile.createdAt, profile.updatedAt],
+        )
+        await client.query(
+          'INSERT INTO credentials (profile_id, username, password_hash, password_salt, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6)',
+          [credential.profileId, credential.username, credential.passwordHash, credential.passwordSalt, credential.createdAt, credential.updatedAt],
+        )
+      })
+
+      const sessionId = createSession(profile.id)
+      setSessionCookie(response, sessionId)
+      setJson(response, 200, { profile, sessionId })
+      return
+    }
+
+    const state = await readState()
     const profile = registerProfile(state, payload)
     await writeState(state)
 
@@ -692,6 +1138,77 @@ async function handleAuthRequest(request, response) {
 
   if (pathname === '/api/auth/login' && method === 'POST') {
     const payload = await readJsonBody(request)
+
+    if (isPostgresStorage()) {
+      const username = String(payload.username ?? '').trim().toLowerCase()
+      const profileResult = await postgresQuery(
+        `
+          SELECT
+            p.id,
+            p.username,
+            p.display_name,
+            p.created_at,
+            p.updated_at,
+            c.profile_id,
+            c.password_hash,
+            c.password_salt,
+            c.created_at AS credential_created_at,
+            c.updated_at AS credential_updated_at
+          FROM profiles p
+          JOIN credentials c ON c.profile_id = p.id
+          WHERE p.username = $1
+          LIMIT 1
+        `,
+        [username],
+      )
+
+      const row = profileResult.rows[0]
+
+      if (!row) {
+        setJson(response, 400, { message: 'Nie znaleziono profilu o podanej nazwie użytkownika' })
+        return
+      }
+
+      const localState = {
+        profiles: [
+          {
+            id: row.id,
+            username: row.username,
+            displayName: row.display_name,
+            createdAt: row.created_at,
+            updatedAt: row.updated_at,
+          },
+        ],
+        credentials: [
+          {
+            profileId: row.profile_id,
+            username: row.username,
+            passwordHash: row.password_hash,
+            passwordSalt: row.password_salt,
+            createdAt: row.credential_created_at,
+            updatedAt: row.credential_updated_at,
+          },
+        ],
+        vehicles: [],
+        serviceEvents: [],
+      }
+
+      const profile = loginProfile(localState, payload)
+      const updatedProfile = localState.profiles[0]
+      const updatedCredential = localState.credentials[0]
+
+      await postgresTransaction(async (client) => {
+        await client.query('UPDATE profiles SET updated_at = $1 WHERE id = $2', [updatedProfile.updatedAt, updatedProfile.id])
+        await client.query('UPDATE credentials SET updated_at = $1 WHERE profile_id = $2', [updatedCredential.updatedAt, updatedCredential.profileId])
+      })
+
+      const sessionId = createSession(profile.id)
+      setSessionCookie(response, sessionId)
+      setJson(response, 200, { profile, sessionId })
+      return
+    }
+
+    const state = await readState()
     const profile = loginProfile(state, payload)
     await writeState(state)
 
@@ -711,6 +1228,83 @@ async function handleAuthRequest(request, response) {
 
     const payload = await readJsonBody(request)
     const payloadUsername = String(payload.username ?? '').trim().toLowerCase()
+
+    if (isPostgresStorage()) {
+      const credentialResult = await postgresQuery('SELECT username FROM credentials WHERE profile_id = $1 LIMIT 1', [sessionProfileId])
+      const credential = credentialResult.rows[0]
+
+      if (!credential || credential.username !== payloadUsername) {
+        setJson(response, 403, { message: 'Brak aktywnej sesji profilu' })
+        return
+      }
+
+      const profileRow = await postgresQuery(
+        `
+          SELECT
+            p.id,
+            p.username,
+            p.display_name,
+            p.created_at,
+            p.updated_at,
+            c.profile_id,
+            c.password_hash,
+            c.password_salt,
+            c.created_at AS credential_created_at,
+            c.updated_at AS credential_updated_at
+          FROM profiles p
+          JOIN credentials c ON c.profile_id = p.id
+          WHERE p.id = $1
+          LIMIT 1
+        `,
+        [sessionProfileId],
+      )
+
+      const row = profileRow.rows[0]
+
+      if (!row) {
+        setJson(response, 403, { message: 'Brak aktywnej sesji profilu' })
+        return
+      }
+
+      const localState = {
+        profiles: [
+          {
+            id: row.id,
+            username: row.username,
+            displayName: row.display_name,
+            createdAt: row.created_at,
+            updatedAt: row.updated_at,
+          },
+        ],
+        credentials: [
+          {
+            profileId: row.profile_id,
+            username: row.username,
+            passwordHash: row.password_hash,
+            passwordSalt: row.password_salt,
+            createdAt: row.credential_created_at,
+            updatedAt: row.credential_updated_at,
+          },
+        ],
+        vehicles: [],
+        serviceEvents: [],
+      }
+
+      resetPassword(localState, payload)
+      const updatedCredential = localState.credentials[0]
+
+      await postgresQuery('UPDATE credentials SET password_hash = $1, password_salt = $2, updated_at = $3 WHERE profile_id = $4', [
+        updatedCredential.passwordHash,
+        updatedCredential.passwordSalt,
+        updatedCredential.updatedAt,
+        updatedCredential.profileId,
+      ])
+
+      setJson(response, 200, { ok: true })
+      return
+    }
+
+    const state = await readState()
     const credential = state.credentials.find((entry) => entry.profileId === sessionProfileId)
 
     if (!credential || credential.username !== payloadUsername) {
@@ -734,6 +1328,74 @@ async function handleAuthRequest(request, response) {
       return
     }
 
+    if (isPostgresStorage()) {
+      const profileRow = await postgresQuery(
+        `
+          SELECT
+            p.id,
+            p.username,
+            p.display_name,
+            p.created_at,
+            p.updated_at,
+            c.profile_id,
+            c.password_hash,
+            c.password_salt,
+            c.created_at AS credential_created_at,
+            c.updated_at AS credential_updated_at
+          FROM profiles p
+          JOIN credentials c ON c.profile_id = p.id
+          WHERE p.id = $1
+          LIMIT 1
+        `,
+        [sessionProfileId],
+      )
+
+      const row = profileRow.rows[0]
+
+      if (!row) {
+        setJson(response, 403, { message: 'Brak aktywnej sesji profilu' })
+        return
+      }
+
+      const localState = {
+        profiles: [
+          {
+            id: row.id,
+            username: row.username,
+            displayName: row.display_name,
+            createdAt: row.created_at,
+            updatedAt: row.updated_at,
+          },
+        ],
+        credentials: [
+          {
+            profileId: row.profile_id,
+            username: row.username,
+            passwordHash: row.password_hash,
+            passwordSalt: row.password_salt,
+            createdAt: row.credential_created_at,
+            updatedAt: row.credential_updated_at,
+          },
+        ],
+        vehicles: [],
+        serviceEvents: [],
+      }
+
+      changePassword(localState, payload)
+      const updatedCredential = localState.credentials[0]
+
+      await postgresQuery('UPDATE credentials SET password_hash = $1, password_salt = $2, updated_at = $3 WHERE profile_id = $4', [
+        updatedCredential.passwordHash,
+        updatedCredential.passwordSalt,
+        updatedCredential.updatedAt,
+        updatedCredential.profileId,
+      ])
+
+      setJson(response, 200, { ok: true })
+      return
+    }
+
+    const state = await readState()
     changePassword(state, payload)
     await writeState(state)
     setJson(response, 200, { ok: true })
