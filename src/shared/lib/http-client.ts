@@ -38,7 +38,13 @@ export async function httpRequest<TResponse>(url: string, init?: HttpRequestInit
       body: init?.body !== undefined ? JSON.stringify(init.body) : undefined,
     })
   } catch {
-    throw new Error('Brak połączenia z API. Uruchom npm run dev i odśwież stronę.')
+    const host = typeof window !== 'undefined' ? window.location.hostname : ''
+    const isLocalHost = host === 'localhost' || host === '127.0.0.1'
+    const message = isLocalHost
+      ? 'Brak połączenia z API. Uruchom npm run dev i odśwież stronę.'
+      : 'Brak połączenia z API. Sprawdź konfigurację domeny API (DNS/SSL) i spróbuj ponownie.'
+
+    throw new Error(message)
   }
 
   const contentType = response.headers.get('content-type') ?? ''

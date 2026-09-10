@@ -756,6 +756,20 @@ const server = http.createServer(async (request, response) => {
     await handleAuthRequest(request, response)
   } catch (error) {
     const mapped = mapErrorToResponse(error)
+    if (mapped.statusCode >= 500) {
+      const cause = error instanceof StorageError ? error.cause : undefined
+      // eslint-disable-next-line no-console
+      console.error('[auth-api] request failed', {
+        method: request.method,
+        url: request.url,
+        statusCode: mapped.statusCode,
+        message: mapped.message,
+        errorMessage: error instanceof Error ? error.message : String(error),
+        errorCode: typeof error?.code === 'string' ? error.code : undefined,
+        causeMessage: cause instanceof Error ? cause.message : undefined,
+        causeCode: typeof cause?.code === 'string' ? cause.code : undefined,
+      })
+    }
     setJson(response, mapped.statusCode, { message: mapped.message })
   }
 })

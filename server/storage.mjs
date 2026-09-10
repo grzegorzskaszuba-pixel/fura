@@ -77,7 +77,23 @@ function isTransientPostgresError(error) {
   const code = typeof error?.code === 'string' ? error.code : ''
   const message = String(error?.message ?? '').toLowerCase()
 
-  if (code === '57P01' || code === '57P02' || code === '57P03' || code === '08000' || code === '08001' || code === '08003' || code === '08004' || code === '08006') {
+  if (
+    code === '57P01' ||
+    code === '57P02' ||
+    code === '57P03' ||
+    code === '08000' ||
+    code === '08001' ||
+    code === '08003' ||
+    code === '08004' ||
+    code === '08006' ||
+    code === '53300' ||
+    code === 'ETIMEDOUT' ||
+    code === 'ECONNRESET' ||
+    code === 'ECONNREFUSED' ||
+    code === 'EHOSTUNREACH' ||
+    code === 'ENETUNREACH' ||
+    code === 'ENOTFOUND'
+  ) {
     return true
   }
 
@@ -85,8 +101,12 @@ function isTransientPostgresError(error) {
     message.includes('connection terminated unexpectedly') ||
     message.includes('terminating connection') ||
     message.includes('connection reset') ||
-    message.includes('ecconnreset') ||
+    message.includes('econnreset') ||
+    message.includes('econnrefused') ||
+    message.includes('enotfound') ||
+    message.includes('etimedout') ||
     message.includes('connection timeout') ||
+    message.includes('too many clients already') ||
     message.includes('client has encountered a connection error')
   )
 }
@@ -94,6 +114,14 @@ function isTransientPostgresError(error) {
 function toStorageError(error) {
   if (error instanceof StorageError) {
     return error
+  }
+
+  if (error instanceof Error && error.message.includes('Brak konfiguracji bazy PostgreSQL')) {
+    return new StorageError(error.message, {
+      statusCode: 500,
+      retryable: false,
+      cause: error,
+    })
   }
 
   if (isTransientPostgresError(error)) {
