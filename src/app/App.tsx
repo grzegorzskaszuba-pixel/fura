@@ -484,7 +484,20 @@ export default function App() {
               onVehicleSelect={(vehicleId) => void handleVehicleSelect(vehicleId)}
             />
 
-            <ServiceSummary vehicle={activeVehicle} completedEvents={completedEvents} plannedEvents={plannedEvents} />
+            <ServiceSummary
+              vehicle={activeVehicle}
+              completedEvents={completedEvents}
+              plannedEvents={plannedEvents}
+              onNextServiceClick={() => {
+                const nextPlannedService = plannedEvents[0]
+
+                if (!nextPlannedService) {
+                  return
+                }
+
+                setDetailEventId(nextPlannedService.id)
+              }}
+            />
 
             <ServiceEventList
               tab={serviceTab}
