@@ -141,14 +141,20 @@ export function ServiceEventDetail({ event, vehicle, open, onOpenChange, onEdit,
         </div>
 
         <div className="space-y-4 text-sm leading-7 text-zinc-600">
-          {event.description ? <p>{event.description}</p> : null}
+          {event.description ? (
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-zinc-400">Opis</p>
+              <p className="mt-1">{event.description}</p>
+            </div>
+          ) : null}
           {event.workshopName ? (
-            <p>
-              <span className="font-medium text-zinc-950">Warsztat:</span> {event.workshopName}
-            </p>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-zinc-400">Warsztat</p>
+              <p className="mt-1 font-medium text-zinc-950">{event.workshopName}</p>
+            </div>
           ) : null}
           {event.workshopLocation ? (
-            <div className="space-y-2 rounded-[24px] border border-zinc-200 bg-zinc-50 p-3 sm:p-4">
+            <div className="space-y-2">
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-zinc-400">Lokalizacja</p>
               <p className="text-sm text-zinc-700">{event.workshopLocation.address ?? event.workshopLocation.label}</p>
               <GoogleMiniMap location={event.workshopLocation} apiKey={appConfig.googleMapsApiKey} />
@@ -157,7 +163,7 @@ export function ServiceEventDetail({ event, vehicle, open, onOpenChange, onEdit,
         </div>
 
         {attachments.length > 0 ? (
-          <div className="space-y-3 rounded-[28px] border border-zinc-200 bg-white p-3 sm:p-4" data-testid="attachment-gallery">
+          <div className="space-y-3 p-3 sm:p-4" data-testid="attachment-gallery">
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-xs font-semibold uppercase tracking-[0.14em] text-zinc-400">Załączniki</p>

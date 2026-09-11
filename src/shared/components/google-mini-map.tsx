@@ -21,7 +21,7 @@ export function GoogleMiniMap({ location, apiKey, className }: GoogleMiniMapProp
       <iframe
         title={`Mapa lokalizacji: ${location.label}`}
         src={buildEmbedUrl(location, apiKey)}
-        className="h-44 w-full rounded-2xl border border-zinc-200"
+        className="h-44 w-full rounded-2xl"
         loading="lazy"
         referrerPolicy="no-referrer-when-downgrade"
       />

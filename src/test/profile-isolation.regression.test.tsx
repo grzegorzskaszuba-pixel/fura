@@ -27,10 +27,11 @@ describe('Profile isolation regression', () => {
     await user.click(screen.getByTestId('profile-menu-trigger'))
 
     await waitFor(() => {
-      expect(screen.getByText('@tester')).toBeInTheDocument()
+      expect(screen.getByText('Wyloguj')).toBeInTheDocument()
     })
 
-    expect(screen.queryByText(`@${secondaryUsername}`)).not.toBeInTheDocument()
+    expect(screen.queryByText(secondaryUsername)).not.toBeInTheDocument()
+    expect(screen.queryByText('Other Profile')).not.toBeInTheDocument()
     expect(screen.queryByText('Profile lokalne')).not.toBeInTheDocument()
   })
 })

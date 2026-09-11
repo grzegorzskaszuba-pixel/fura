@@ -1,4 +1,4 @@
-import { CarFront, ChevronDown, Pencil, Plus, Trash2, Wrench } from 'lucide-react'
+import { CarFront, Pencil, Plus, Trash2, Wrench } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 
 import { appStateRepository } from '@/data/repositories/app-state-repository'
@@ -393,16 +393,11 @@ export default function App() {
                   <button
                     type="button"
                     aria-label="Menu auta"
-                    className="inline-flex items-center justify-center rounded-full bg-white p-2 shadow-sm ring-1 ring-zinc-200/80 transition hover:ring-zinc-300 sm:gap-3 sm:px-3 sm:py-2"
+                    className="inline-flex items-center justify-center rounded-full bg-white p-2 shadow-sm ring-1 ring-zinc-200/80 transition hover:ring-zinc-300"
                   >
                     <span className="flex h-10 w-10 items-center justify-center rounded-full bg-zinc-950 text-white">
                       <CarFront className="h-5 w-5" />
                     </span>
-                    <span className="hidden text-left sm:block">
-                      <span className="block text-sm font-semibold text-zinc-950">Auto</span>
-                      <span className="block max-w-28 truncate text-xs text-zinc-500">{activeVehicle.name}</span>
-                    </span>
-                    <ChevronDown className="hidden h-4 w-4 text-zinc-500 sm:block" />
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start">
@@ -414,7 +409,7 @@ export default function App() {
                     }}
                   >
                     <Pencil className="mr-2 h-4 w-4" />
-                    Edytuj wybrane
+                    {activeVehicle.name}
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem

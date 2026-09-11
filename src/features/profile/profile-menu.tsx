@@ -1,4 +1,4 @@
-import { LogOut, UserCircle2 } from 'lucide-react'
+import { LogOut, Pencil, UserCircle2 } from 'lucide-react'
 
 import {
   DropdownMenu,
@@ -31,9 +31,9 @@ export function ProfileMenu({ currentProfile, onOpenProfile, onLogout }: Profile
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start">
         <DropdownMenuItem onSelect={onOpenProfile}>
-          <div>
+          <div className="flex items-start gap-2">
+            <Pencil className="mt-0.5 h-4 w-4 shrink-0" />
             <div className="font-medium text-zinc-900">{currentProfile.displayName ?? currentProfile.username}</div>
-            <div className="text-xs text-zinc-500">{currentProfile.username}</div>
           </div>
         </DropdownMenuItem>
         <DropdownMenuItem onSelect={onLogout}>
