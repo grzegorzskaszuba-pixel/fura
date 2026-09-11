@@ -44,7 +44,7 @@ export function ResponsiveModal({
               <DrawerTitle className="min-w-0 flex-1 pr-1">{title}</DrawerTitle>
               <DrawerClose
                 aria-label="Zamknij"
-                className="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-900"
+                className="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-primary bg-white text-zinc-950 transition-colors hover:bg-orange-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               >
                 <X className="h-5 w-5" />
               </DrawerClose>

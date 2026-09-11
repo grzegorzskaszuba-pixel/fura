@@ -24,7 +24,7 @@ export function DialogContent({ className, children, ...props }: React.Component
         {...props}
       >
         {children}
-        <DialogPrimitive.Close className="absolute right-5 top-5 rounded-full p-2 text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-900">
+        <DialogPrimitive.Close className="absolute right-5 top-5 inline-flex h-9 w-9 items-center justify-center rounded-full border border-primary bg-white text-zinc-950 transition-colors hover:bg-orange-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
           <X className="h-4 w-4" />
           <span className="sr-only">Zamknij</span>
         </DialogPrimitive.Close>

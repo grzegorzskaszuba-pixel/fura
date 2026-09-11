@@ -275,7 +275,7 @@ export function ServiceEventDetail({ event, vehicle, open, onOpenChange, onEdit,
             <button
               type="button"
               aria-label="Zamknij podgląd załącznika"
-              className="absolute right-4 top-4 inline-flex h-10 w-10 items-center justify-center rounded-full text-white/80 transition hover:bg-white/10 hover:text-white"
+              className="absolute right-4 top-4 inline-flex h-10 w-10 items-center justify-center rounded-full border border-primary bg-white text-zinc-950 transition-colors hover:bg-orange-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               onClick={() => setViewerOpen(false)}
             >
               <X className="h-5 w-5" />
