@@ -435,15 +435,15 @@ export default function App() {
               </DropdownMenu>
             ) : null}
           </div>
-          <div className="relative inline-flex h-10 w-[172px] items-center justify-end" aria-label="Branding FURA">
+          <div className="relative inline-flex h-14 w-[188px] items-center justify-end" aria-label="Branding FURA">
             <span
               aria-hidden="true"
               className={cn(
-                'absolute right-0 top-1/2 inline-flex h-10 -translate-y-1/2 items-center justify-center overflow-hidden rounded-full bg-white p-[2px] text-white shadow-sm ring-1 ring-zinc-200/80 transition-all duration-700 ease-in-out',
-                logoPhase === 'pill' ? 'w-[136px] opacity-100' : 'w-10 opacity-100',
+                'absolute right-0 top-1/2 inline-flex h-14 -translate-y-1/2 items-center justify-center overflow-hidden rounded-full bg-white p-2 text-white shadow-sm ring-1 ring-zinc-200/80 transition-all duration-700 ease-in-out',
+                logoPhase === 'pill' ? 'w-[152px] opacity-100' : 'w-14 opacity-100',
               )}
             >
-              <span className="absolute inset-[2px] rounded-full bg-zinc-950" />
+              <span className="absolute inset-2 rounded-full bg-zinc-950" />
               <span
                 className={cn(
                   'absolute inset-0 z-10 grid place-items-center text-[28px] font-semibold leading-none tracking-[-0.06em] transition-opacity duration-500',
