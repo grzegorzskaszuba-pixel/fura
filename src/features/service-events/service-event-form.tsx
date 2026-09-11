@@ -46,6 +46,10 @@ const recurrenceUnitOptions = [
   { value: 'months', label: 'Miesięcy' },
   { value: 'years', label: 'Lat' },
 ] as const
+const totalCostFormatter = new Intl.NumberFormat('pl-PL', {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+})
 
 const serviceEventSchema = z.object({
   status: z.enum(['completed', 'planned']),
@@ -232,10 +236,7 @@ export function ServiceEventForm({
   const recurrenceType = form.watch('recurrenceType') ?? 'time'
   const isSubmitting = form.formState.isSubmitting
   const totalCost = (form.watch('laborCost') ?? 0) + (form.watch('partsCost') ?? 0) + (form.watch('otherCost') ?? 0)
-  const totalCostDisplay = new Intl.NumberFormat('pl-PL', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(totalCost)
+  const totalCostDisplay = totalCostFormatter.format(totalCost)
   const attachmentCount = form.watch('attachmentCount') ?? 0
 
   useEffect(() => {

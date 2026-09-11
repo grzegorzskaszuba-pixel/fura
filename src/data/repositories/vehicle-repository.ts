@@ -40,7 +40,8 @@ export const vehicleRepository = {
     }
 
     const response = await httpRequest<{ vehicles: Vehicle[] }>(vehiclesBaseUrl)
-    return response.vehicles.filter((vehicle) => vehicle.profileId === profileId && !vehicle.archived)
+    void profileId
+    return response.vehicles
   },
 
   async syncByProfile(profileId: string) {

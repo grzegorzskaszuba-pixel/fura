@@ -25,6 +25,7 @@ const ALLOWED_ORIGINS = String(process.env.AUTH_API_ALLOWED_ORIGINS ?? '*')
   .filter((origin) => origin.length > 0)
 const sessions = new Map()
 const startedAt = new Date().toISOString()
+let cachedLegacyState = null
 
 function isInputError(error) {
   if (!(error instanceof Error)) {
@@ -196,6 +197,15 @@ function getRequestSessionId(request) {
 
 function getAuthenticatedProfileId(request) {
   return getSessionProfileId(sessions, getRequestSessionId(request))
+}
+
+async function getCachedLegacyState() {
+  if (cachedLegacyState) {
+    return cachedLegacyState
+  }
+
+  cachedLegacyState = await readState()
+  return cachedLegacyState
 }
 
 function normalizeOptionalString(value) {
@@ -1133,27 +1143,29 @@ async function handleAuthRequest(request, response) {
         return
       }
 
-      const existing = await postgresQuery('SELECT id FROM profiles WHERE username = $1 LIMIT 1', [username])
-
-      if (existing.rows[0]) {
-        setJson(response, 400, { message: 'Taki profil już istnieje' })
-        return
-      }
-
       const localState = { profiles: [], credentials: [], vehicles: [], serviceEvents: [] }
       const profile = registerProfile(localState, payload)
       const credential = localState.credentials[0]
 
-      await postgresTransaction(async (client) => {
-        await client.query(
-          'INSERT INTO profiles (id, username, display_name, created_at, updated_at) VALUES ($1, $2, $3, $4, $5)',
-          [profile.id, profile.username, profile.displayName, profile.createdAt, profile.updatedAt],
-        )
-        await client.query(
-          'INSERT INTO credentials (profile_id, username, password_hash, password_salt, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6)',
-          [credential.profileId, credential.username, credential.passwordHash, credential.passwordSalt, credential.createdAt, credential.updatedAt],
-        )
-      })
+      try {
+        await postgresTransaction(async (client) => {
+          await client.query(
+            'INSERT INTO profiles (id, username, display_name, created_at, updated_at) VALUES ($1, $2, $3, $4, $5)',
+            [profile.id, profile.username, profile.displayName, profile.createdAt, profile.updatedAt],
+          )
+          await client.query(
+            'INSERT INTO credentials (profile_id, username, password_hash, password_salt, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6)',
+            [credential.profileId, credential.username, credential.passwordHash, credential.passwordSalt, credential.createdAt, credential.updatedAt],
+          )
+        })
+      } catch (error) {
+        if (typeof error === 'object' && error !== null && 'code' in error && error.code === '23505') {
+          setJson(response, 400, { message: 'Taki profil już istnieje' })
+          return
+        }
+
+        throw error
+      }
 
       const sessionId = createSession(profile.id)
       setSessionCookie(response, sessionId)
@@ -1200,7 +1212,7 @@ async function handleAuthRequest(request, response) {
       let row = profileResult.rows[0]
 
       if (!row) {
-        const legacyState = await readState()
+        const legacyState = await getCachedLegacyState()
 
         try {
           const legacyProfile = loginProfile(legacyState, payload)

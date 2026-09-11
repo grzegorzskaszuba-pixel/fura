@@ -17,6 +17,12 @@ function writeStorage(key: string, value: string | null) {
     return
   }
 
+  const currentValue = window.localStorage.getItem(key)
+
+  if (value === currentValue) {
+    return
+  }
+
   if (value === null) {
     window.localStorage.removeItem(key)
     return

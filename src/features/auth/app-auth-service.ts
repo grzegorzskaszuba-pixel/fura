@@ -12,9 +12,11 @@ async function setAndReturnProfile(profileId: string) {
     throw new Error('Profil nie istnieje')
   }
 
-  await appStateRepository.setCurrentProfileId(profile.id)
-  await profileRepository.touch(profile.id)
-  await authCredentialRepository.touch(profile.id)
+  await Promise.all([
+    appStateRepository.setCurrentProfileId(profile.id),
+    profileRepository.touch(profile.id),
+    authCredentialRepository.touch(profile.id),
+  ])
   return profile
 }
 

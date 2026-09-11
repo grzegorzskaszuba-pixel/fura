@@ -53,6 +53,9 @@ export default function App() {
   const editingEvent = useMemo(() => serviceEvents.find((event) => event.id === editingEventId) ?? null, [editingEventId, serviceEvents])
   const detailEvent = useMemo(() => serviceEvents.find((event) => event.id === detailEventId) ?? null, [detailEventId, serviceEvents])
   const logoPhase: LogoPhase = logoPhases[logoPhaseIndex]
+  const completedEvents = useMemo(() => sortEventsDesc(serviceEvents.filter((event) => event.status === 'completed')), [serviceEvents])
+  const plannedEvents = useMemo(() => sortEventsAsc(serviceEvents.filter((event) => event.status === 'planned')), [serviceEvents])
+  const visibleEvents = useMemo(() => (serviceTab === 'history' ? completedEvents : plannedEvents), [completedEvents, plannedEvents, serviceTab])
 
   async function loadProfileWorkspace(profileId: string) {
     const [profile, savedVehicleId, profileVehicles] = await Promise.all([
@@ -210,10 +213,6 @@ export default function App() {
     )
   }
 
-  const completedEvents = sortEventsDesc(serviceEvents.filter((event) => event.status === 'completed'))
-  const plannedEvents = sortEventsAsc(serviceEvents.filter((event) => event.status === 'planned'))
-  const visibleEvents = serviceTab === 'history' ? completedEvents : plannedEvents
-
   async function handleVehicleSave(values: VehicleFormValues) {
     if (!currentProfileId) {
       return
@@ -262,18 +261,26 @@ export default function App() {
     }
 
     if (editingEvent) {
-      await serviceEventRepository.update(editingEvent.id, values)
+      const updatedEvent = await serviceEventRepository.update(editingEvent.id, values)
       await maybeUpdateVehicleMileage(activeVehicle.id, values.mileage)
-      const events = await serviceEventRepository.listByVehicle(currentProfileId, activeVehicle.id)
-      setServiceEvents(events)
+      setServiceEvents((previousEvents) => {
+        const index = previousEvents.findIndex((event) => event.id === updatedEvent.id)
+
+        if (index === -1) {
+          return [updatedEvent, ...previousEvents]
+        }
+
+        const nextEvents = previousEvents.slice()
+        nextEvents[index] = updatedEvent
+        return nextEvents
+      })
       setEditingEventId(null)
       return
     }
 
-    await serviceEventRepository.create(currentProfileId, activeVehicle.id, values)
+    const createdEvent = await serviceEventRepository.create(currentProfileId, activeVehicle.id, values)
     await maybeUpdateVehicleMileage(activeVehicle.id, values.mileage)
-    const events = await serviceEventRepository.listByVehicle(currentProfileId, activeVehicle.id)
-    setServiceEvents(events)
+    setServiceEvents((previousEvents) => [createdEvent, ...previousEvents])
   }
 
   async function maybeUpdateVehicleMileage(vehicleId: string, mileage?: number) {
@@ -287,7 +294,7 @@ export default function App() {
       return
     }
 
-    await vehicleRepository.update(vehicleId, {
+    const updatedVehicle = await vehicleRepository.update(vehicleId, {
       name: vehicle.name,
       make: vehicle.make,
       model: vehicle.model,
@@ -304,14 +311,11 @@ export default function App() {
       imageUrl: vehicle.imageUrl,
       notes: vehicle.notes,
     })
-
-    if (currentProfileId) {
-      await reloadVehicles(currentProfileId)
-    }
+    setVehicles((previousVehicles) => previousVehicles.map((entry) => (entry.id === updatedVehicle.id ? updatedVehicle : entry)))
   }
 
   async function handleMarkCompleted(event: ServiceEvent) {
-    await serviceEventRepository.update(event.id, {
+    const updatedEvent = await serviceEventRepository.update(event.id, {
       status: 'completed',
       category: event.category,
       title: event.title,
@@ -333,16 +337,14 @@ export default function App() {
       recurrenceMileageInterval: event.recurrenceMileageInterval,
     })
     await maybeUpdateVehicleMileage(event.vehicleId, event.mileage)
+    setServiceEvents((previousEvents) => previousEvents.map((entry) => (entry.id === updatedEvent.id ? updatedEvent : entry)))
     setDetailEventId(null)
     setServiceTab('history')
   }
 
   async function handleDeleteEvent(eventId: string) {
     await serviceEventRepository.remove(eventId)
-    if (currentProfileId && activeVehicle?.id) {
-      const events = await serviceEventRepository.listByVehicle(currentProfileId, activeVehicle.id)
-      setServiceEvents(events)
-    }
+    setServiceEvents((previousEvents) => previousEvents.filter((event) => event.id !== eventId))
     setEditingEventId(null)
     setDetailEventId(null)
   }

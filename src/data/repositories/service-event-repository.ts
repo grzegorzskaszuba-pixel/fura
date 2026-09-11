@@ -44,7 +44,8 @@ export const serviceEventRepository = {
     }
 
     const response = await httpRequest<{ events: ServiceEvent[] }>(`${serviceEventsBaseUrl}?vehicleId=${encodeURIComponent(vehicleId)}`)
-    return response.events.filter((event) => event.profileId === profileId && event.vehicleId === vehicleId)
+    void profileId
+    return response.events
   },
 
   async syncByVehicle(profileId: string, vehicleId: string) {
