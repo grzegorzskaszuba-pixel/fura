@@ -446,7 +446,7 @@ export default function App() {
               <span className="absolute inset-2 rounded-full bg-zinc-950" />
               <span
                 className={cn(
-                  'absolute inset-0 z-10 grid place-items-center text-[28px] font-semibold leading-none tracking-[-0.06em] transition-opacity duration-500',
+                  'absolute inset-0 z-10 grid place-items-center text-[30px] font-semibold leading-none tracking-[-0.06em] transition-opacity duration-500',
                   logoPhase === 'pill' ? 'opacity-100' : 'opacity-0',
                 )}
               >
@@ -454,7 +454,7 @@ export default function App() {
               </span>
               <span
                 className={cn(
-                  'absolute inset-0 z-10 grid place-items-center text-[28px] font-semibold leading-none tracking-[-0.03em] transition-opacity duration-500',
+                  'absolute inset-0 z-10 grid place-items-center text-[30px] font-semibold leading-none tracking-[-0.03em] transition-opacity duration-500',
                   logoPhase === 'icon' ? 'opacity-100' : 'opacity-0',
                 )}
               >
