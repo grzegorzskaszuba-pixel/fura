@@ -25,7 +25,7 @@ import { sortEventsAsc, sortEventsDesc } from '@/shared/lib/format'
 import type { ServiceEvent, ServiceEventFormValues, ServiceTab, UserProfile, Vehicle, VehicleFormValues } from '@/shared/types/domain'
 
 const LOGO_PHASE_INTERVAL_MS = 10000
-const logoPhases = ['pill-dark', 'icon', 'pill-dark', 'pill-light'] as const
+const logoPhases = ['pill', 'icon'] as const
 type LogoPhase = (typeof logoPhases)[number]
 
 export default function App() {
@@ -435,28 +435,25 @@ export default function App() {
               </DropdownMenu>
             ) : null}
           </div>
-          <div className="relative inline-flex h-14 w-[220px] items-center justify-end pr-4 sm:w-[260px]" aria-label="Branding FURA">
+          <div className="relative inline-flex h-10 w-[172px] items-center justify-end" aria-label="Branding FURA">
             <span
               aria-hidden="true"
               className={cn(
-                'absolute right-0 top-1/2 inline-flex h-14 -translate-y-1/2 items-center justify-center overflow-hidden shadow-sm ring-1 transition-all duration-700 ease-in-out',
-                logoPhase === 'pill-dark' ? 'w-[168px] rounded-full bg-zinc-950 px-4 text-white ring-zinc-950/90 opacity-100' : '',
-                logoPhase === 'pill-light' ? 'w-[168px] rounded-full bg-white px-4 text-zinc-950 ring-zinc-200/80 opacity-100' : '',
-                logoPhase === 'icon' ? 'w-14 rounded-full bg-zinc-950 text-white ring-zinc-950/90 opacity-100' : '',
-                logoPhase !== 'pill-dark' && logoPhase !== 'pill-light' && logoPhase !== 'icon' ? 'opacity-0 scale-95' : '',
+                'absolute right-0 top-1/2 inline-flex h-10 -translate-y-1/2 items-center justify-center overflow-hidden rounded-full bg-zinc-950 text-white shadow-sm ring-1 ring-zinc-200/80 transition-all duration-700 ease-in-out',
+                logoPhase === 'pill' ? 'w-[136px] opacity-100' : 'w-10 opacity-100',
               )}
             >
               <span
                 className={cn(
-                  'absolute inset-0 grid -translate-x-[0.05em] place-items-center text-[52px] font-semibold leading-none tracking-[-0.08em] transition-opacity duration-500',
-                  logoPhase === 'pill-dark' || logoPhase === 'pill-light' ? 'opacity-100' : 'opacity-0',
+                  'absolute inset-0 grid place-items-center text-[26px] font-semibold leading-none tracking-[-0.06em] transition-opacity duration-500',
+                  logoPhase === 'pill' ? 'opacity-100' : 'opacity-0',
                 )}
               >
                 FURA
               </span>
               <span
                 className={cn(
-                  'absolute inset-0 grid -translate-x-[0.05em] place-items-center text-[52px] font-semibold leading-none tracking-[-0.08em] transition-opacity duration-500',
+                  'absolute inset-0 grid place-items-center text-[26px] font-semibold leading-none tracking-[-0.03em] transition-opacity duration-500',
                   logoPhase === 'icon' ? 'opacity-100' : 'opacity-0',
                 )}
               >
