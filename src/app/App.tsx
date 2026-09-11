@@ -439,13 +439,14 @@ export default function App() {
             <span
               aria-hidden="true"
               className={cn(
-                'absolute right-0 top-1/2 inline-flex h-10 -translate-y-1/2 items-center justify-center overflow-hidden rounded-full bg-zinc-950 text-white shadow-sm ring-1 ring-zinc-200/80 transition-all duration-700 ease-in-out',
+                'absolute right-0 top-1/2 inline-flex h-10 -translate-y-1/2 items-center justify-center overflow-hidden rounded-full bg-white p-[2px] text-white shadow-sm ring-1 ring-zinc-200/80 transition-all duration-700 ease-in-out',
                 logoPhase === 'pill' ? 'w-[136px] opacity-100' : 'w-10 opacity-100',
               )}
             >
+              <span className="absolute inset-[2px] rounded-full bg-zinc-950" />
               <span
                 className={cn(
-                  'absolute inset-0 grid place-items-center text-[26px] font-semibold leading-none tracking-[-0.06em] transition-opacity duration-500',
+                  'absolute inset-0 z-10 grid place-items-center text-[28px] font-semibold leading-none tracking-[-0.06em] transition-opacity duration-500',
                   logoPhase === 'pill' ? 'opacity-100' : 'opacity-0',
                 )}
               >
@@ -453,7 +454,7 @@ export default function App() {
               </span>
               <span
                 className={cn(
-                  'absolute inset-0 grid place-items-center text-[26px] font-semibold leading-none tracking-[-0.03em] transition-opacity duration-500',
+                  'absolute inset-0 z-10 grid place-items-center text-[28px] font-semibold leading-none tracking-[-0.03em] transition-opacity duration-500',
                   logoPhase === 'icon' ? 'opacity-100' : 'opacity-0',
                 )}
               >
