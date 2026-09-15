@@ -124,10 +124,10 @@ export function ShareBrochureModal({
                 <img
                   src={qrDataUrl}
                   alt="Kod QR do publicznej historii serwisowej"
-                  className="w-full max-w-full rounded-none border-0 bg-transparent p-0"
+                  className="w-[75%] max-w-full rounded-none border-0 bg-transparent p-0"
                 />
               ) : (
-                <div className="grid aspect-square w-full place-items-center text-sm text-zinc-500">Ładowanie QR...</div>
+                <div className="grid aspect-square w-[75%] place-items-center text-sm text-zinc-500">Ładowanie QR...</div>
               )}
             </div>
 
