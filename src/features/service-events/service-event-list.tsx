@@ -114,7 +114,12 @@ export function ServiceEventList({ tab, vehicle, events, isLoading, onTabChange,
       <div onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
         {isLoading ? (
           <EmptyState
-            icon={<Wrench className="h-6 w-6" />}
+            icon={
+              <span className="relative inline-flex h-10 w-10 items-center justify-center" aria-hidden="true">
+                <span className="absolute inset-[-6px] rounded-full border-2 border-zinc-300 border-t-zinc-700 animate-spin" />
+                <Wrench className="h-6 w-6" />
+              </span>
+            }
             title={tab === 'history' ? 'Ładowanie historii serwisowej...' : 'Ładowanie planu serwisowego...'}
             description={tab === 'history' ? 'Pobieram wpisy serwisowe dla wybranego auta.' : 'Pobieram zaplanowane wpisy dla wybranego auta.'}
           />
