@@ -106,7 +106,7 @@ export function ShareBrochureModal({
       open={open}
       onOpenChange={onOpenChange}
       title="Podziel się dokumentacją"
-      description={`Publiczny podglad dla: ${vehicleName}`}
+      description={`Publiczny podgląd dla: ${vehicleName}`}
     >
       <div className="space-y-4 pb-2">
         <p className="text-sm text-zinc-600">
@@ -128,16 +128,16 @@ export function ShareBrochureModal({
         {isLoading ? <p className="text-sm text-zinc-500">Sprawdzam aktywny link...</p> : null}
 
         {shareUrl ? (
-          <div className="space-y-3 rounded-2xl border border-zinc-200 bg-zinc-50/60 p-4">
+          <div className="space-y-3">
             <div className="flex justify-center">
               {qrDataUrl ? (
                 <img
                   src={qrDataUrl}
                   alt="Kod QR do publicznej historii serwisowej"
-                  className="h-[220px] w-[220px] rounded-2xl border border-zinc-200 bg-white p-2"
+                  className="w-full max-w-full rounded-none border-0 bg-transparent p-0"
                 />
               ) : (
-                <div className="grid h-[220px] w-[220px] place-items-center rounded-2xl border border-zinc-200 bg-white text-sm text-zinc-500">Ladowanie QR...</div>
+                <div className="grid aspect-square w-full place-items-center text-sm text-zinc-500">Ładowanie QR...</div>
               )}
             </div>
 
@@ -148,19 +148,25 @@ export function ShareBrochureModal({
             </div>
 
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-              <Button type="button" variant="outline" onClick={() => void handleCopy()}>
+              <Button type="button" variant="outline" className="h-11 justify-center gap-2 text-sm font-medium tracking-normal" onClick={() => void handleCopy()}>
                 <Copy className="h-4 w-4" />
                 {copyLabel}
               </Button>
-              <Button type="button" variant="outline" asChild>
+              <Button type="button" variant="outline" className="h-11 justify-center gap-2 text-sm font-medium tracking-normal" asChild>
                 <a href={shareUrl} target="_blank" rel="noreferrer">
                   <ExternalLink className="h-4 w-4" />
-                  Otworz
+                  Otwórz
                 </a>
               </Button>
-              <Button type="button" variant="outline" onClick={() => void handleRevoke()} disabled={isRevoking}>
+              <Button
+                type="button"
+                variant="outline"
+                className="h-11 justify-center gap-2 text-sm font-medium tracking-normal"
+                onClick={() => void handleRevoke()}
+                disabled={isRevoking}
+              >
                 <ShieldOff className="h-4 w-4" />
-                {isRevoking ? '...' : 'Uniewaznij'}
+                {isRevoking ? '...' : 'Unieważnij'}
               </Button>
             </div>
           </div>
