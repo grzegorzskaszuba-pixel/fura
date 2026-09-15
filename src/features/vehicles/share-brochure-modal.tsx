@@ -92,6 +92,14 @@ export function ShareBrochureModal({
     }
   }
 
+  function handleOpen() {
+    if (!shareUrl || typeof window === 'undefined') {
+      return
+    }
+
+    window.open(shareUrl, '_blank', 'noopener,noreferrer')
+  }
+
   return (
     <ResponsiveModal
       open={open}
@@ -151,12 +159,10 @@ export function ShareBrochureModal({
                 type="button"
                 variant="outline"
                 className="h-10 justify-center gap-1.5 px-2 text-[13px] font-medium tracking-normal whitespace-nowrap font-sans sm:h-11 sm:gap-2 sm:text-sm"
-                asChild
+                onClick={handleOpen}
               >
-                <a href={shareUrl} target="_blank" rel="noreferrer">
-                  <ExternalLink className="h-4 w-4" />
-                  Otwórz
-                </a>
+                <ExternalLink className="h-4 w-4 shrink-0" />
+                Otwórz
               </Button>
               <Button
                 type="button"
