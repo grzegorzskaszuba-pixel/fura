@@ -309,7 +309,7 @@ describe('data API integration', () => {
     expect(listEvents.response.status).toBe(404)
   })
 
-  it('creates 12h public share brochure link for own vehicle', async () => {
+  it('creates 6h public share brochure link for own vehicle', async () => {
     const stamp = Date.now()
     const cookie = await registerAndGetCookie(`share_ok_${stamp}`)
 
@@ -352,8 +352,8 @@ describe('data API integration', () => {
     expect(sharePayload.id.length).toBeGreaterThanOrEqual(40)
     expect(sharePayload.url).toContain(`/api/public-share/${sharePayload.id}`)
     const ttlMs = new Date(sharePayload.expiresAt).getTime() - Date.now()
-    expect(ttlMs).toBeGreaterThan(11 * 60 * 60 * 1000)
-    expect(ttlMs).toBeLessThanOrEqual(12 * 60 * 60 * 1000)
+    expect(ttlMs).toBeGreaterThan(5 * 60 * 60 * 1000)
+    expect(ttlMs).toBeLessThanOrEqual(6 * 60 * 60 * 1000)
 
     const publicResponse = await fetch(sharePayload.url)
     const html = await publicResponse.text()
@@ -393,7 +393,7 @@ describe('data API integration', () => {
     expect(shareAsA.response.status).toBe(404)
   })
 
-  it('lists active share brochures and allows revoking own link', async () => {
+  it('returns one active share brochure per vehicle and allows revoking it', async () => {
     const stamp = Date.now()
     const cookie = await registerAndGetCookie(`share_list_${stamp}`)
 
@@ -424,14 +424,16 @@ describe('data API integration', () => {
     expect(share1.response.status).toBe(200)
     expect(share2.response.status).toBe(200)
 
-    const first = (await share1.response.json()) as { id: string }
-    const second = (await share2.response.json()) as { id: string }
+    const first = (await share1.response.json()) as { id: string; expiresAt: string }
+    const second = (await share2.response.json()) as { id: string; expiresAt: string }
+    expect(second.id).toBe(first.id)
+    expect(second.expiresAt).toBe(first.expiresAt)
 
     const list = await apiRequest(`/api/share-brochures?vehicleId=${vehicle.vehicle.id}`, { cookie })
     expect(list.response.status).toBe(200)
     const listPayload = (await list.response.json()) as { brochures: Array<{ id: string; url: string }> }
-    expect(listPayload.brochures.map((entry) => entry.id)).toContain(first.id)
-    expect(listPayload.brochures.map((entry) => entry.id)).toContain(second.id)
+    expect(listPayload.brochures).toHaveLength(1)
+    expect(listPayload.brochures[0]?.id).toBe(first.id)
 
     const revoke = await apiRequest(`/api/share-brochures/${first.id}`, {
       method: 'DELETE',
@@ -442,43 +444,6 @@ describe('data API integration', () => {
     const listAfter = await apiRequest(`/api/share-brochures?vehicleId=${vehicle.vehicle.id}`, { cookie })
     expect(listAfter.response.status).toBe(200)
     const listAfterPayload = (await listAfter.response.json()) as { brochures: Array<{ id: string }> }
-    expect(listAfterPayload.brochures.map((entry) => entry.id)).not.toContain(first.id)
-    expect(listAfterPayload.brochures.map((entry) => entry.id)).toContain(second.id)
-  })
-
-  it('enforces max 5 active share brochures per vehicle', async () => {
-    const stamp = Date.now()
-    const cookie = await registerAndGetCookie(`share_limit_${stamp}`)
-
-    const createVehicle = await apiRequest('/api/vehicles', {
-      method: 'POST',
-      cookie,
-      body: {
-        name: 'Kia Ceed',
-        make: 'Kia',
-        model: 'Ceed',
-      },
-    })
-
-    expect(createVehicle.response.status).toBe(200)
-    const vehicle = (await createVehicle.response.json()) as { vehicle: { id: string } }
-
-    for (let i = 0; i < 5; i += 1) {
-      const createShare = await apiRequest('/api/share-brochures', {
-        method: 'POST',
-        cookie,
-        body: { vehicleId: vehicle.vehicle.id },
-      })
-
-      expect(createShare.response.status).toBe(200)
-    }
-
-    const sixthShare = await apiRequest('/api/share-brochures', {
-      method: 'POST',
-      cookie,
-      body: { vehicleId: vehicle.vehicle.id },
-    })
-
-    expect(sixthShare.response.status).toBe(429)
+    expect(listAfterPayload.brochures).toHaveLength(0)
   })
 })

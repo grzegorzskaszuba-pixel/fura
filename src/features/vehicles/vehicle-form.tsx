@@ -102,6 +102,7 @@ export function VehicleForm({ open, onOpenChange, initialValues, onSubmit }: Veh
     resolver: zodResolver(vehicleSchema),
     defaultValues: emptyVehicleValues,
   })
+  const isSubmitting = form.formState.isSubmitting
   const imageUrl = form.watch('imageUrl')
 
   useEffect(() => {
@@ -311,11 +312,12 @@ export function VehicleForm({ open, onOpenChange, initialValues, onSubmit }: Veh
 
         <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-end">
           {submitError ? <p className="text-sm text-red-600 sm:mr-auto">{submitError}</p> : null}
-          <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
+          <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
             Anuluj
           </Button>
-          <Button type="submit" data-testid="vehicle-submit">
-            {initialValues ? 'Zapisz auto' : 'Dodaj auto'}
+          <Button type="submit" data-testid="vehicle-submit" disabled={isSubmitting} aria-busy={isSubmitting}>
+            {isSubmitting ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" aria-hidden="true" /> : null}
+            {isSubmitting ? 'Zapisywanie...' : initialValues ? 'Zapisz auto' : 'Dodaj auto'}
           </Button>
         </div>
       </form>

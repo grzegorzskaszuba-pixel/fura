@@ -35,6 +35,11 @@ export const shareBrochureRepository = {
     return response.brochures
   },
 
+  async getActive(vehicleId: string) {
+    const active = await this.listActive(vehicleId)
+    return active[0] ?? null
+  },
+
   async revoke(id: string) {
     await httpRequest<void>(`${shareBrochureBaseUrl}/${encodeURIComponent(id)}`, {
       method: 'DELETE',

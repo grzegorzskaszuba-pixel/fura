@@ -26,9 +26,8 @@ const ALLOWED_ORIGINS = String(process.env.AUTH_API_ALLOWED_ORIGINS ?? '*')
 const sessions = new Map()
 const startedAt = new Date().toISOString()
 let cachedLegacyState = null
-const SHARE_BROCHURE_TTL_MS = 12 * 60 * 60 * 1000
+const SHARE_BROCHURE_TTL_MS = 6 * 60 * 60 * 1000
 const MAX_SHARED_HISTORY_ITEMS = 30
-const MAX_ACTIVE_SHARE_LINKS_PER_VEHICLE = 5
 
 function isInputError(error) {
   if (!(error instanceof Error)) {
@@ -655,7 +654,7 @@ function renderShareBrochureHtml(snapshot) {
     <main class="wrap">
       <div class="brand-bar">
         <span class="fura-pill">FURA</span>
-        <span class="readonly">Tylko odczyt • Link wazny 12h</span>
+        <span class="readonly">Tylko odczyt • Link wazny 6h</span>
       </div>
 
       <section class="hero">
@@ -966,7 +965,7 @@ async function handleAuthRequest(request, response) {
 
       const result = vehicleIdFilter
         ? await postgresQuery(
-            'SELECT id, vehicle_id, created_at, expires_at FROM share_brochures WHERE profile_id = $1 AND vehicle_id = $2 ORDER BY created_at DESC',
+            'SELECT id, vehicle_id, created_at, expires_at FROM share_brochures WHERE profile_id = $1 AND vehicle_id = $2 ORDER BY created_at DESC LIMIT 1',
             [profileId, vehicleIdFilter],
           )
         : await postgresQuery(
@@ -995,12 +994,13 @@ async function handleAuthRequest(request, response) {
       return
     }
 
-    const brochures = (state.shareBrochures ?? [])
+    const allBrochures = (state.shareBrochures ?? [])
       .filter((entry) => entry.profileId === profileId)
       .filter((entry) => (vehicleIdFilter ? entry.vehicleId === vehicleIdFilter : true))
       .filter((entry) => ownVehicleIds.has(entry.vehicleId))
       .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
-      .map((entry) => toShareBrochureListItem(request, requestUrl, entry))
+
+    const brochures = (vehicleIdFilter ? allBrochures.slice(0, 1) : allBrochures).map((entry) => toShareBrochureListItem(request, requestUrl, entry))
 
     setJson(response, 200, { brochures })
     return
@@ -1364,9 +1364,6 @@ async function handleAuthRequest(request, response) {
     }
 
     await cleanupExpiredShareBrochures()
-    const createdAt = new Date().toISOString()
-    const expiresAt = new Date(Date.now() + SHARE_BROCHURE_TTL_MS).toISOString()
-    const id = createShareBrochureId()
 
     if (isPostgresStorage()) {
       const vehicleResult = await postgresQuery('SELECT * FROM vehicles WHERE id = $1 AND profile_id = $2 LIMIT 1', [vehicleId, profileId])
@@ -1377,16 +1374,24 @@ async function handleAuthRequest(request, response) {
         return
       }
 
-      const activeCountResult = await postgresQuery(
-        'SELECT COUNT(*)::int AS active_count FROM share_brochures WHERE profile_id = $1 AND vehicle_id = $2 AND expires_at > NOW()',
+      const activeShareResult = await postgresQuery(
+        'SELECT id, expires_at FROM share_brochures WHERE profile_id = $1 AND vehicle_id = $2 AND expires_at > NOW() ORDER BY created_at DESC LIMIT 1',
         [profileId, vehicleId],
       )
-      const activeCount = Number(activeCountResult.rows[0]?.active_count ?? 0)
+      const activeShare = activeShareResult.rows[0]
 
-      if (activeCount >= MAX_ACTIVE_SHARE_LINKS_PER_VEHICLE) {
-        setJson(response, 429, { message: `Mozesz miec maksymalnie ${MAX_ACTIVE_SHARE_LINKS_PER_VEHICLE} aktywnych linkow dla jednego auta.` })
+      if (activeShare) {
+        setJson(response, 200, {
+          id: activeShare.id,
+          expiresAt: activeShare.expires_at,
+          url: buildPublicShareUrl(request, requestUrl, activeShare.id),
+        })
         return
       }
+
+      const createdAt = new Date().toISOString()
+      const expiresAt = new Date(Date.now() + SHARE_BROCHURE_TTL_MS).toISOString()
+      const id = createShareBrochureId()
 
       const eventResult = await postgresQuery(
         'SELECT * FROM service_events WHERE profile_id = $1 AND vehicle_id = $2 AND status = $3 ORDER BY updated_at DESC',
@@ -1421,14 +1426,22 @@ async function handleAuthRequest(request, response) {
       return
     }
 
-    const activeCount = (state.shareBrochures ?? []).filter(
-      (entry) => entry.profileId === profileId && entry.vehicleId === vehicleId && !isExpired(entry.expiresAt),
-    ).length
+    const activeShare = (state.shareBrochures ?? [])
+      .filter((entry) => entry.profileId === profileId && entry.vehicleId === vehicleId && !isExpired(entry.expiresAt))
+      .sort((left, right) => right.createdAt.localeCompare(left.createdAt))[0]
 
-    if (activeCount >= MAX_ACTIVE_SHARE_LINKS_PER_VEHICLE) {
-      setJson(response, 429, { message: `Mozesz miec maksymalnie ${MAX_ACTIVE_SHARE_LINKS_PER_VEHICLE} aktywnych linkow dla jednego auta.` })
+    if (activeShare) {
+      setJson(response, 200, {
+        id: activeShare.id,
+        expiresAt: activeShare.expiresAt,
+        url: buildPublicShareUrl(request, requestUrl, activeShare.id),
+      })
       return
     }
+
+    const createdAt = new Date().toISOString()
+    const expiresAt = new Date(Date.now() + SHARE_BROCHURE_TTL_MS).toISOString()
+    const id = createShareBrochureId()
 
     const vehicleEvents = state.serviceEvents.filter((entry) => entry.profileId === profileId && entry.vehicleId === vehicleId && entry.status === 'completed')
     const snapshot = createBrochurePayload(vehicle, vehicleEvents, createdAt, expiresAt)

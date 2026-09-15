@@ -3,7 +3,6 @@ import { useEffect, useMemo, useState } from 'react'
 
 import { appStateRepository } from '@/data/repositories/app-state-repository'
 import { profileRepository } from '@/data/repositories/profile-repository'
-import type { ActiveShareBrochure } from '@/data/repositories/share-brochure-repository'
 import { shareBrochureRepository } from '@/data/repositories/share-brochure-repository'
 import { serviceEventRepository } from '@/data/repositories/service-event-repository'
 import { vehicleRepository } from '@/data/repositories/vehicle-repository'
@@ -52,12 +51,12 @@ export default function App() {
   const [logoPhaseIndex, setLogoPhaseIndex] = useState(0)
   const [deleteVehicleDialogOpen, setDeleteVehicleDialogOpen] = useState(false)
   const [shareModalOpen, setShareModalOpen] = useState(false)
+  const [shareId, setShareId] = useState<string | null>(null)
   const [shareUrl, setShareUrl] = useState<string | null>(null)
   const [shareExpiresAt, setShareExpiresAt] = useState<string | null>(null)
   const [shareError, setShareError] = useState<string | null>(null)
   const [isShareGenerating, setIsShareGenerating] = useState(false)
-  const [activeShareLinks, setActiveShareLinks] = useState<ActiveShareBrochure[]>([])
-  const [isShareLinksLoading, setIsShareLinksLoading] = useState(false)
+  const [isShareLoading, setIsShareLoading] = useState(false)
 
   const activeVehicle = useMemo(() => vehicles.find((vehicle) => vehicle.id === activeVehicleId) ?? vehicles[0] ?? null, [activeVehicleId, vehicles])
   const editingVehicle = useMemo(() => vehicles.find((vehicle) => vehicle.id === editingVehicleId) ?? null, [editingVehicleId, vehicles])
@@ -153,12 +152,12 @@ export default function App() {
   }, [currentProfileId, persistedActiveVehicleId, vehicles])
 
   useEffect(() => {
+    setShareId(null)
     setShareUrl(null)
     setShareExpiresAt(null)
     setShareError(null)
     setShareModalOpen(false)
-    setActiveShareLinks([])
-    setIsShareLinksLoading(false)
+    setIsShareLoading(false)
   }, [activeVehicle?.id])
 
   useEffect(() => {
@@ -403,11 +402,11 @@ export default function App() {
     setDetailEventId(null)
     setProfileSettingsOpen(false)
     setShareModalOpen(false)
+    setShareId(null)
     setShareUrl(null)
     setShareExpiresAt(null)
     setShareError(null)
-    setActiveShareLinks([])
-    setIsShareLinksLoading(false)
+    setIsShareLoading(false)
 
     try {
       await authService.logout()
@@ -416,28 +415,58 @@ export default function App() {
     }
   }
 
-  async function loadActiveShareLinks(vehicleId: string, preferredShareId?: string) {
-    setIsShareLinksLoading(true)
+  async function loadActiveShareLink(vehicleId: string) {
+    setIsShareLoading(true)
 
     try {
-      const links = await shareBrochureRepository.listActive(vehicleId)
-      setActiveShareLinks(links)
+      const activeLink = await shareBrochureRepository.getActive(vehicleId)
 
-      const selected = preferredShareId ? links.find((link) => link.id === preferredShareId) ?? null : links[0] ?? null
-
-      if (selected) {
-        setShareUrl(selected.url)
-        setShareExpiresAt(selected.expiresAt)
+      if (activeLink) {
+        setShareId(activeLink.id)
+        setShareUrl(activeLink.url)
+        setShareExpiresAt(activeLink.expiresAt)
       } else {
+        setShareId(null)
         setShareUrl(null)
         setShareExpiresAt(null)
       }
     } catch (error) {
-      setShareError(error instanceof Error ? error.message : 'Nie udalo sie pobrac listy aktywnych linkow.')
+      setShareError(error instanceof Error ? error.message : 'Nie udalo sie pobrac aktywnego linku.')
     } finally {
-      setIsShareLinksLoading(false)
+      setIsShareLoading(false)
     }
   }
+
+  useEffect(() => {
+    if (!shareExpiresAt) {
+      return
+    }
+
+    const expiresAtMs = new Date(shareExpiresAt).getTime()
+
+    if (Number.isNaN(expiresAtMs)) {
+      return
+    }
+
+    const msLeft = expiresAtMs - Date.now()
+
+    if (msLeft <= 0) {
+      setShareId(null)
+      setShareUrl(null)
+      setShareExpiresAt(null)
+      return
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setShareId(null)
+      setShareUrl(null)
+      setShareExpiresAt(null)
+    }, msLeft + 300)
+
+    return () => {
+      window.clearTimeout(timeoutId)
+    }
+  }, [shareExpiresAt])
 
   async function handleGenerateShareBrochure() {
     if (!activeVehicle) {
@@ -449,7 +478,9 @@ export default function App() {
 
     try {
       const share = await shareBrochureRepository.create(activeVehicle.id)
-      await loadActiveShareLinks(activeVehicle.id, share.id)
+      setShareId(share.id)
+      setShareUrl(share.url)
+      setShareExpiresAt(share.expiresAt)
     } catch (error) {
       setShareError(error instanceof Error ? error.message : 'Nie udalo sie wygenerowac linku do udostepnienia.')
     } finally {
@@ -457,8 +488,8 @@ export default function App() {
     }
   }
 
-  async function handleRevokeShareBrochure(shareId: string) {
-    if (!activeVehicle) {
+  async function handleRevokeShareBrochure() {
+    if (!activeVehicle || !shareId) {
       return
     }
 
@@ -466,7 +497,7 @@ export default function App() {
 
     try {
       await shareBrochureRepository.revoke(shareId)
-      await loadActiveShareLinks(activeVehicle.id)
+      await loadActiveShareLink(activeVehicle.id)
     } catch (error) {
       setShareError(error instanceof Error ? error.message : 'Nie udalo sie uniewaznic linku.')
     }
@@ -527,7 +558,7 @@ export default function App() {
                     onSelect={() => {
                       setShareError(null)
                       setShareModalOpen(true)
-                      void loadActiveShareLinks(activeVehicle.id)
+                      void loadActiveShareLink(activeVehicle.id)
                     }}
                   >
                     <Share2 className="mr-2 h-4 w-4" />
@@ -667,17 +698,13 @@ export default function App() {
           open={shareModalOpen}
           onOpenChange={setShareModalOpen}
           vehicleName={activeVehicle.name}
+          shareId={shareId}
           shareUrl={shareUrl}
           expiresAt={shareExpiresAt}
-          activeLinks={activeShareLinks}
-          isLoadingLinks={isShareLinksLoading}
+          isLoading={isShareLoading}
           isGenerating={isShareGenerating}
           error={shareError}
           onGenerate={handleGenerateShareBrochure}
-          onSelectLink={(link) => {
-            setShareUrl(link.url)
-            setShareExpiresAt(link.expiresAt)
-          }}
           onRevoke={handleRevokeShareBrochure}
         />
       ) : null}
