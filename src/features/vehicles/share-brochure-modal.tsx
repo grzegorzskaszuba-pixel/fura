@@ -118,12 +118,12 @@ export function ShareBrochureModal({
     <ResponsiveModal
       open={open}
       onOpenChange={onOpenChange}
-      title="Podziel sie historia"
+      title="Udostepnij historie"
       description={`Publiczny podglad dla: ${vehicleName}`}
     >
       <div className="space-y-4 pb-2">
         <p className="text-sm text-zinc-600">
-          Wygeneruj jednorazowy link QR do uproszczonej historii serwisowej. Link dziala przez 24h i prowadzi do odseparowanej strony read-only.
+          Wygeneruj link QR do uproszczonej historii serwisowej. Link dziala przez 12h i prowadzi do odseparowanej strony tylko do odczytu.
         </p>
 
         <Button type="button" className="w-full" onClick={() => void onGenerate()} disabled={isGenerating || isLimitReached}>
@@ -161,7 +161,7 @@ export function ShareBrochureModal({
 
             <div className="space-y-2">
               <Input readOnly value={shareUrl} aria-label="Link do publicznej broszury" />
-              <p className="text-xs text-zinc-500">Wygasa: {expiresAt ? formatDate(expiresAt) : 'za 24h'}</p>
+              <p className="text-xs text-zinc-500">Wygasa: {expiresAt ? formatDate(expiresAt) : 'za 12h'}</p>
             </div>
 
             <div className="grid grid-cols-2 gap-2">

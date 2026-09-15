@@ -309,7 +309,7 @@ describe('data API integration', () => {
     expect(listEvents.response.status).toBe(404)
   })
 
-  it('creates 24h public share brochure link for own vehicle', async () => {
+  it('creates 12h public share brochure link for own vehicle', async () => {
     const stamp = Date.now()
     const cookie = await registerAndGetCookie(`share_ok_${stamp}`)
 
@@ -351,7 +351,9 @@ describe('data API integration', () => {
     const sharePayload = (await shareResponse.response.json()) as { id: string; expiresAt: string; url: string }
     expect(sharePayload.id.length).toBeGreaterThanOrEqual(40)
     expect(sharePayload.url).toContain(`/api/public-share/${sharePayload.id}`)
-    expect(new Date(sharePayload.expiresAt).getTime()).toBeGreaterThan(Date.now())
+    const ttlMs = new Date(sharePayload.expiresAt).getTime() - Date.now()
+    expect(ttlMs).toBeGreaterThan(11 * 60 * 60 * 1000)
+    expect(ttlMs).toBeLessThanOrEqual(12 * 60 * 60 * 1000)
 
     const publicResponse = await fetch(sharePayload.url)
     const html = await publicResponse.text()

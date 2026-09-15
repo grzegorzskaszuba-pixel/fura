@@ -26,7 +26,7 @@ const ALLOWED_ORIGINS = String(process.env.AUTH_API_ALLOWED_ORIGINS ?? '*')
 const sessions = new Map()
 const startedAt = new Date().toISOString()
 let cachedLegacyState = null
-const SHARE_BROCHURE_TTL_MS = 24 * 60 * 60 * 1000
+const SHARE_BROCHURE_TTL_MS = 12 * 60 * 60 * 1000
 const MAX_SHARED_HISTORY_ITEMS = 30
 const MAX_ACTIVE_SHARE_LINKS_PER_VEHICLE = 5
 
@@ -373,6 +373,28 @@ function mapPublicEvents(events) {
     }))
 }
 
+function getCategoryLabel(category) {
+  const labels = {
+    inspection: 'Przeglad',
+    periodic_service: 'Serwis okresowy',
+    diagnostics: 'Diagnostyka',
+    repair: 'Naprawa',
+    oil_fluids: 'Oleje i plyny',
+    brakes: 'Hamulce',
+    tires_wheels: 'Opony i kola',
+    suspension_steering: 'Zawieszenie i uklad kierowniczy',
+    engine_drivetrain: 'Silnik i naped',
+    electrical: 'Elektryka',
+    body_paint: 'Blacharka i lakier',
+    detailing: 'Detailing',
+    tuning: 'Tuning',
+    documents: 'Dokumenty',
+    other: 'Inne',
+  }
+
+  return labels[category] ?? 'Inne'
+}
+
 function createBrochurePayload(vehicle, events, createdAt, expiresAt) {
   const publicEvents = mapPublicEvents(events)
   const totalCost = publicEvents.reduce((sum, event) => sum + event.totalCost, 0)
@@ -456,7 +478,7 @@ function renderShareBrochureHtml(snapshot) {
             <p class="event-cost">${escapeHtml(formatPlCurrency(event.totalCost))}</p>
           </div>
           <p class="muted">${escapeHtml(formatPlDate(event.eventDate))} • ${escapeHtml(formatMileage(event.mileage))}</p>
-          <p class="chip">${escapeHtml(event.category)}</p>
+          <p class="chip">${escapeHtml(getCategoryLabel(event.category))}</p>
           ${workshopLine}
           ${descriptionLine}
         </article>
@@ -475,59 +497,89 @@ function renderShareBrochureHtml(snapshot) {
     <style>
       :root {
         color-scheme: light;
-        --bg: #f5f5f4;
+        --bg: #f8fafc;
         --card: #ffffff;
-        --ink: #111827;
+        --ink: #18181b;
         --muted: #52525b;
-        --line: #e4e4e7;
+        --line: #e5e7eb;
         --accent: #ea580c;
+        --dark: #111827;
       }
       * { box-sizing: border-box; }
       body {
         margin: 0;
-        font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-        background: radial-gradient(circle at top, #fff7ed 0%, var(--bg) 60%);
+        font-family: 'Inter', ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        background:
+          radial-gradient(1200px 380px at 5% -20%, #fff7ed 0%, transparent 65%),
+          radial-gradient(900px 300px at 100% 0%, #ffe7d0 0%, transparent 60%),
+          var(--bg);
         color: var(--ink);
       }
       .wrap {
-        max-width: 900px;
+        max-width: 980px;
         margin: 0 auto;
-        padding: 24px 16px 56px;
+        padding: 20px 16px 56px;
+      }
+      .brand-bar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 14px;
+      }
+      .fura-pill {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        height: 44px;
+        min-width: 112px;
+        border-radius: 999px;
+        background: var(--dark);
+        color: #fff;
+        font-weight: 700;
+        letter-spacing: -0.03em;
+      }
+      .readonly {
+        font-size: 12px;
+        color: #334155;
+        background: #ffffff;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 7px 12px;
       }
       .hero {
         background: var(--card);
         border: 1px solid var(--line);
-        border-radius: 24px;
-        padding: 20px;
-        box-shadow: 0 10px 35px rgba(15, 23, 42, 0.06);
+        border-radius: 28px;
+        padding: 22px;
+        box-shadow: 0 12px 38px rgba(15, 23, 42, 0.07);
       }
       .badge {
         display: inline-block;
-        padding: 6px 10px;
+        padding: 7px 11px;
         font-size: 12px;
-        letter-spacing: 0.08em;
+        letter-spacing: 0.1em;
         text-transform: uppercase;
         border-radius: 999px;
-        background: #fff7ed;
-        color: var(--accent);
+        background: #fff2e6;
+        color: #9a3412;
       }
       h1 {
         margin: 12px 0 6px;
-        font-size: clamp(24px, 4.8vw, 38px);
+        font-size: clamp(25px, 4.8vw, 42px);
         letter-spacing: -0.04em;
       }
       .muted { margin: 4px 0 0; color: var(--muted); }
       .grid {
-        margin-top: 14px;
+        margin-top: 16px;
         display: grid;
-        gap: 10px;
+        gap: 12px;
         grid-template-columns: repeat(2, minmax(0, 1fr));
       }
       .stat {
         border: 1px solid var(--line);
-        border-radius: 16px;
-        padding: 12px;
-        background: #fafafa;
+        border-radius: 18px;
+        padding: 14px;
+        background: linear-gradient(180deg, #ffffff 0%, #fbfbfc 100%);
       }
       .stat-label {
         margin: 0;
@@ -538,20 +590,21 @@ function renderShareBrochureHtml(snapshot) {
       }
       .stat-value {
         margin: 6px 0 0;
-        font-size: 18px;
-        font-weight: 600;
+        font-size: 20px;
+        font-weight: 700;
         letter-spacing: -0.03em;
       }
       .events {
-        margin-top: 18px;
+        margin-top: 20px;
         display: grid;
-        gap: 12px;
+        gap: 14px;
       }
       .event-card {
-        border-radius: 18px;
+        border-radius: 22px;
         border: 1px solid var(--line);
         background: var(--card);
-        padding: 14px;
+        padding: 16px;
+        box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
       }
       .event-top {
         display: flex;
@@ -560,8 +613,8 @@ function renderShareBrochureHtml(snapshot) {
       }
       .event-title {
         margin: 0;
-        font-size: 17px;
-        font-weight: 600;
+        font-size: 18px;
+        font-weight: 700;
         letter-spacing: -0.02em;
       }
       .event-cost {
@@ -575,20 +628,21 @@ function renderShareBrochureHtml(snapshot) {
         align-items: center;
         margin-top: 8px;
         border-radius: 999px;
-        background: #f4f4f5;
+        background: #f8fafc;
+        border: 1px solid var(--line);
         color: #3f3f46;
         padding: 5px 10px;
         font-size: 12px;
       }
       .empty {
         border: 1px dashed var(--line);
-        border-radius: 18px;
+        border-radius: 22px;
         background: #fff;
         color: var(--muted);
-        padding: 18px;
+        padding: 20px;
       }
       footer {
-        margin-top: 18px;
+        margin-top: 20px;
         color: var(--muted);
         font-size: 12px;
       }
@@ -599,6 +653,11 @@ function renderShareBrochureHtml(snapshot) {
   </head>
   <body>
     <main class="wrap">
+      <div class="brand-bar">
+        <span class="fura-pill">FURA</span>
+        <span class="readonly">Tylko odczyt • Link wazny 12h</span>
+      </div>
+
       <section class="hero">
         <span class="badge">FURA • Publiczny podglad</span>
         <h1>${escapeHtml(vehicleTitle || snapshot.vehicle.name || 'Pojazd')}</h1>
@@ -1407,7 +1466,7 @@ async function handleAuthRequest(request, response) {
     const brochureId = pathname.slice('/api/share-brochures/'.length).trim()
 
     if (!brochureId) {
-      setJson(response, 404, { message: 'Share brochure not found' })
+      setJson(response, 404, { message: 'Link udostepnienia nie istnieje' })
       return
     }
 
@@ -1415,7 +1474,7 @@ async function handleAuthRequest(request, response) {
       const result = await postgresQuery('DELETE FROM share_brochures WHERE id = $1 AND profile_id = $2 RETURNING id', [brochureId, profileId])
 
       if (!result.rows[0]) {
-        setJson(response, 404, { message: 'Share brochure not found' })
+        setJson(response, 404, { message: 'Link udostepnienia nie istnieje' })
         return
       }
 
@@ -1427,7 +1486,7 @@ async function handleAuthRequest(request, response) {
     const existing = (state.shareBrochures ?? []).find((entry) => entry.id === brochureId)
 
     if (!existing || existing.profileId !== profileId) {
-      setJson(response, 404, { message: 'Share brochure not found' })
+      setJson(response, 404, { message: 'Link udostepnienia nie istnieje' })
       return
     }
 
