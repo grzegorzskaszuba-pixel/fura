@@ -1,6 +1,7 @@
 import * as SelectPrimitive from '@radix-ui/react-select'
 import { Check, ChevronDown, ChevronUp } from 'lucide-react'
 
+import { useMediaQuery } from '@/shared/hooks/use-media-query'
 import { cn } from '@/shared/lib/utils'
 
 export const Select = SelectPrimitive.Root
@@ -20,18 +21,26 @@ export function SelectTrigger({ className, children, ...props }: React.Component
   )
 }
 
-export function SelectContent({ className, children, position = 'popper', ...props }: React.ComponentProps<typeof SelectPrimitive.Content>) {
+export function SelectContent({ className, children, position, ...props }: React.ComponentProps<typeof SelectPrimitive.Content>) {
+  const isMobile = useMediaQuery('(max-width: 767px)')
+  const resolvedPosition = position ?? (isMobile ? 'item-aligned' : 'popper')
+
   return (
     <SelectPrimitive.Portal>
       <SelectPrimitive.Content
-        position={position}
+        position={resolvedPosition}
         className={cn('z-[70] overflow-hidden rounded-2xl border border-white/80 bg-card shadow-[0_18px_60px_rgba(15,23,42,0.14)]', className)}
         {...props}
       >
         <SelectPrimitive.ScrollUpButton className="flex h-8 items-center justify-center text-zinc-500">
           <ChevronUp className="h-4 w-4" />
         </SelectPrimitive.ScrollUpButton>
-        <SelectPrimitive.Viewport className="max-h-[min(18rem,var(--radix-select-content-available-height))] overflow-y-auto overscroll-contain p-2 touch-pan-y">
+        <SelectPrimitive.Viewport
+          className={cn(
+            'overflow-y-auto overscroll-contain p-2 touch-pan-y',
+            isMobile ? 'max-h-72' : 'max-h-[min(18rem,var(--radix-select-content-available-height))]',
+          )}
+        >
           {children}
         </SelectPrimitive.Viewport>
         <SelectPrimitive.ScrollDownButton className="flex h-8 items-center justify-center text-zinc-500">
