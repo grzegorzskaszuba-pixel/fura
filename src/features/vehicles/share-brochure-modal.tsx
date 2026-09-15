@@ -10,7 +10,6 @@ import { formatDate } from '@/shared/lib/format'
 interface ShareBrochureModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  vehicleName: string
   shareId: string | null
   shareUrl: string | null
   expiresAt: string | null
@@ -24,7 +23,6 @@ interface ShareBrochureModalProps {
 export function ShareBrochureModal({
   open,
   onOpenChange,
-  vehicleName,
   shareId,
   shareUrl,
   expiresAt,

@@ -697,7 +697,6 @@ export default function App() {
         <ShareBrochureModal
           open={shareModalOpen}
           onOpenChange={setShareModalOpen}
-          vehicleName={activeVehicle.name}
           shareId={shareId}
           shareUrl={shareUrl}
           expiresAt={shareExpiresAt}
