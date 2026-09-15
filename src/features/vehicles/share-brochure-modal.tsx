@@ -35,14 +35,7 @@ export function ShareBrochureModal({
   onRevoke,
 }: ShareBrochureModalProps) {
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null)
-  const [copyLabel, setCopyLabel] = useState('Kopiuj link')
   const [isRevoking, setIsRevoking] = useState(false)
-
-  useEffect(() => {
-    if (!open) {
-      setCopyLabel('Kopiuj link')
-    }
-  }, [open])
 
   useEffect(() => {
     let active = true
@@ -87,8 +80,6 @@ export function ShareBrochureModal({
     }
 
     await navigator.clipboard.writeText(shareUrl)
-    setCopyLabel('Skopiowano')
-    window.setTimeout(() => setCopyLabel('Kopiuj link'), 1800)
   }
 
   async function handleRevoke() {
@@ -110,9 +101,8 @@ export function ShareBrochureModal({
     >
       <div className="space-y-4 pb-2">
         <p className="text-sm text-zinc-600">
-          Wygeneruj link QR do uproszczonej historii serwisowej twojego samochodu. Link jest aktywny tylko przez 6h i prowadzi do odizolowanej strony, która nie jest powiązana z Twoim profilem.
+          Link QR do podglądu historii Twojego samochodu jest aktywny tylko przez 6h i prowadzi do osobnej strony, która nie jest powiązana z Twoim profilem. Link nie odnawia się automatycznie.
         </p>
-        <p className="text-xs text-zinc-500">Po 6 godzinach link wygasa i nie odnawia się automatycznie. Aby udostępnić ponownie, wygeneruj nowy link.</p>
 
         <Button type="button" className="w-full" onClick={() => void onGenerate()} disabled={isGenerating}>
           <QrCode className="h-4 w-4" />
@@ -147,12 +137,22 @@ export function ShareBrochureModal({
               <p className="text-xs text-zinc-500">Wygasa: {expiresAt ? formatDate(expiresAt) : 'za 6h'}</p>
             </div>
 
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-              <Button type="button" variant="outline" className="h-11 justify-center gap-2 text-sm font-medium tracking-normal" onClick={() => void handleCopy()}>
+            <div className="grid grid-cols-3 gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                className="h-10 justify-center gap-1.5 px-2 text-[13px] font-medium tracking-normal whitespace-nowrap font-sans sm:h-11 sm:gap-2 sm:text-sm"
+                onClick={() => void handleCopy()}
+              >
                 <Copy className="h-4 w-4" />
-                {copyLabel}
+                Kopiuj
               </Button>
-              <Button type="button" variant="outline" className="h-11 justify-center gap-2 text-sm font-medium tracking-normal" asChild>
+              <Button
+                type="button"
+                variant="outline"
+                className="h-10 justify-center gap-1.5 px-2 text-[13px] font-medium tracking-normal whitespace-nowrap font-sans sm:h-11 sm:gap-2 sm:text-sm"
+                asChild
+              >
                 <a href={shareUrl} target="_blank" rel="noreferrer">
                   <ExternalLink className="h-4 w-4" />
                   Otwórz
@@ -161,12 +161,12 @@ export function ShareBrochureModal({
               <Button
                 type="button"
                 variant="outline"
-                className="h-11 justify-center gap-2 text-sm font-medium tracking-normal"
+                className="h-10 justify-center gap-1.5 px-2 text-[13px] font-medium tracking-normal whitespace-nowrap font-sans sm:h-11 sm:gap-2 sm:text-sm"
                 onClick={() => void handleRevoke()}
                 disabled={isRevoking}
               >
                 <ShieldOff className="h-4 w-4" />
-                {isRevoking ? '...' : 'Unieważnij'}
+                {isRevoking ? '...' : 'Usuń'}
               </Button>
             </div>
           </div>
