@@ -42,7 +42,7 @@ function getDaysUntilText(eventDate?: string) {
   const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24))
 
   if (diffDays < 0) {
-    return `${Math.abs(diffDays)} dni po terminie`
+    return 'Po terminie'
   }
 
   if (diffDays === 0) {
@@ -70,7 +70,7 @@ function getDaysUntilValue(eventDate?: string): ReactNode {
   const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24))
 
   if (diffDays < 0) {
-    return `${Math.abs(diffDays)} dni po terminie`
+    return <span className="text-primary">Po terminie</span>
   }
 
   if (diffDays === 0) {
