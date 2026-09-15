@@ -122,21 +122,21 @@ export function ServiceEventDetail({ event, vehicle, open, onOpenChange, onEdit,
         </div>
 
         <div className="grid grid-cols-2 gap-2 sm:gap-3">
-          <div className="rounded-2xl border border-zinc-200/80 bg-zinc-50 px-3 py-2.5 sm:px-3.5 sm:py-3">
+          <div className="rounded-2xl border border-zinc-200/80 px-3 py-2.5 sm:px-3.5 sm:py-3">
             <p className="text-[0.9rem] font-semibold uppercase tracking-[0.14em] text-zinc-950">Data</p>
-            <p className="mt-1 text-base font-semibold text-zinc-950">{formatDate(event.eventDate)}</p>
+            <p className="mt-1 text-base font-semibold text-primary">{formatDate(event.eventDate)}</p>
           </div>
-          <div className="rounded-2xl border border-zinc-200/80 bg-zinc-50 px-3 py-2.5 sm:px-3.5 sm:py-3">
+          <div className="rounded-2xl border border-zinc-200/80 px-3 py-2.5 sm:px-3.5 sm:py-3">
             <p className="text-[0.9rem] font-semibold uppercase tracking-[0.14em] text-zinc-950">Przebieg</p>
-            <p className="mt-1 text-base font-semibold text-zinc-950">{formatMileage(event.mileage)}</p>
+            <p className="mt-1 text-base font-semibold text-primary">{formatMileage(event.mileage)}</p>
           </div>
-          <div className="rounded-2xl border border-zinc-200/80 bg-zinc-50 px-3 py-2.5 sm:px-3.5 sm:py-3">
+          <div className="rounded-2xl border border-zinc-200/80 px-3 py-2.5 sm:px-3.5 sm:py-3">
             <p className="text-[0.9rem] font-semibold uppercase tracking-[0.14em] text-zinc-950">Koszt</p>
-            <p className="mt-1 text-base font-semibold text-zinc-950">{formatCurrency(getEventTotalCost(event))}</p>
+            <p className="mt-1 text-base font-semibold text-primary">{formatCurrency(getEventTotalCost(event))}</p>
           </div>
-          <div className="rounded-2xl border border-zinc-200/80 bg-zinc-50 px-3 py-2.5 sm:px-3.5 sm:py-3">
+          <div className="rounded-2xl border border-zinc-200/80 px-3 py-2.5 sm:px-3.5 sm:py-3">
             <p className="text-[0.9rem] font-semibold uppercase tracking-[0.14em] text-zinc-950">Załączniki</p>
-            <p className="mt-1 text-base font-semibold text-zinc-950">{event.attachmentCount ?? 0}</p>
+            <p className="mt-1 text-base font-semibold text-primary">{event.attachmentCount ?? 0}</p>
           </div>
         </div>
 
