@@ -221,6 +221,37 @@ export default function App() {
     }
   }, [detailEvent])
 
+  useEffect(() => {
+    if (!shareExpiresAt) {
+      return
+    }
+
+    const expiresAtMs = new Date(shareExpiresAt).getTime()
+
+    if (Number.isNaN(expiresAtMs)) {
+      return
+    }
+
+    const msLeft = expiresAtMs - Date.now()
+
+    if (msLeft <= 0) {
+      setShareId(null)
+      setShareUrl(null)
+      setShareExpiresAt(null)
+      return
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setShareId(null)
+      setShareUrl(null)
+      setShareExpiresAt(null)
+    }, msLeft + 300)
+
+    return () => {
+      window.clearTimeout(timeoutId)
+    }
+  }, [shareExpiresAt])
+
   if (!currentProfile) {
     if (isBootstrapping) {
       return (
@@ -436,37 +467,6 @@ export default function App() {
       setIsShareLoading(false)
     }
   }
-
-  useEffect(() => {
-    if (!shareExpiresAt) {
-      return
-    }
-
-    const expiresAtMs = new Date(shareExpiresAt).getTime()
-
-    if (Number.isNaN(expiresAtMs)) {
-      return
-    }
-
-    const msLeft = expiresAtMs - Date.now()
-
-    if (msLeft <= 0) {
-      setShareId(null)
-      setShareUrl(null)
-      setShareExpiresAt(null)
-      return
-    }
-
-    const timeoutId = window.setTimeout(() => {
-      setShareId(null)
-      setShareUrl(null)
-      setShareExpiresAt(null)
-    }, msLeft + 300)
-
-    return () => {
-      window.clearTimeout(timeoutId)
-    }
-  }, [shareExpiresAt])
 
   async function handleGenerateShareBrochure() {
     if (!activeVehicle) {
