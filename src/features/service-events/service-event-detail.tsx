@@ -123,19 +123,19 @@ export function ServiceEventDetail({ event, vehicle, open, onOpenChange, onEdit,
 
         <div className="grid gap-4 rounded-[28px] bg-zinc-50 p-4 sm:grid-cols-2">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-zinc-400">Data</p>
+            <p className="text-[0.9rem] font-semibold uppercase tracking-[0.14em] text-zinc-950">Data</p>
             <p className="mt-1 text-base font-semibold text-zinc-950">{formatDate(event.eventDate)}</p>
           </div>
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-zinc-400">Przebieg</p>
+            <p className="text-[0.9rem] font-semibold uppercase tracking-[0.14em] text-zinc-950">Przebieg</p>
             <p className="mt-1 text-base font-semibold text-zinc-950">{formatMileage(event.mileage)}</p>
           </div>
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-zinc-400">Koszt</p>
+            <p className="text-[0.9rem] font-semibold uppercase tracking-[0.14em] text-zinc-950">Koszt</p>
             <p className="mt-1 text-base font-semibold text-zinc-950">{formatCurrency(getEventTotalCost(event))}</p>
           </div>
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-zinc-400">Załączniki</p>
+            <p className="text-[0.9rem] font-semibold uppercase tracking-[0.14em] text-zinc-950">Załączniki</p>
             <p className="mt-1 text-base font-semibold text-zinc-950">{event.attachmentCount ?? 0}</p>
           </div>
         </div>
@@ -143,19 +143,19 @@ export function ServiceEventDetail({ event, vehicle, open, onOpenChange, onEdit,
         <div className="space-y-4 text-sm leading-7 text-zinc-600">
           {event.description ? (
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-zinc-400">Opis</p>
+              <p className="text-[0.9rem] font-semibold uppercase tracking-[0.14em] text-zinc-950">Opis</p>
               <p className="mt-1">{event.description}</p>
             </div>
           ) : null}
           {event.workshopName ? (
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-zinc-400">Warsztat</p>
+              <p className="text-[0.9rem] font-semibold uppercase tracking-[0.14em] text-zinc-950">Warsztat</p>
               <p className="mt-1 font-medium text-zinc-950">{event.workshopName}</p>
             </div>
           ) : null}
           {event.workshopLocation ? (
             <div className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-zinc-400">Lokalizacja</p>
+              <p className="text-[0.9rem] font-semibold uppercase tracking-[0.14em] text-zinc-950">Lokalizacja</p>
               <p className="text-sm text-zinc-700">{event.workshopLocation.address ?? event.workshopLocation.label}</p>
               <GoogleMiniMap location={event.workshopLocation} apiKey={appConfig.googleMapsApiKey} />
             </div>
@@ -163,10 +163,10 @@ export function ServiceEventDetail({ event, vehicle, open, onOpenChange, onEdit,
         </div>
 
         {attachments.length > 0 ? (
-          <div className="space-y-3 p-3 sm:p-4" data-testid="attachment-gallery">
+          <div className="space-y-3" data-testid="attachment-gallery">
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-zinc-400">Załączniki</p>
+                <p className="text-[0.9rem] font-semibold uppercase tracking-[0.14em] text-zinc-950">Załączniki</p>
                 <p className="truncate text-sm font-medium text-zinc-700">
                   {activeAttachment?.name} {attachments.length > 1 ? `(${activeAttachmentIndex + 1}/${attachments.length})` : ''}
                 </p>
