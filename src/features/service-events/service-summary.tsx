@@ -286,7 +286,7 @@ export function ServiceSummary({ vehicle, completedEvents, plannedEvents, onNext
                   const percent = categorySummary.total > 0 ? (entry.value / categorySummary.total) * 100 : 0
 
                   return (
-                    <div key={entry.category} className="flex items-center gap-3 rounded-2xl bg-zinc-50 px-3 py-2">
+                    <div key={entry.category} className="flex items-center gap-3 rounded-2xl px-3 py-2">
                       <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: entry.color }} aria-hidden="true" />
                       <span className="min-w-0 flex-1 truncate text-sm text-zinc-700">{entry.label}</span>
                       <span className="shrink-0 whitespace-nowrap text-sm font-semibold text-zinc-950">{formatCurrency(entry.value)} ({percent.toFixed(0)}%)</span>

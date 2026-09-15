@@ -121,20 +121,20 @@ export function ServiceEventDetail({ event, vehicle, open, onOpenChange, onEdit,
           {urgency === 'upcoming' ? <Badge variant="accent">Nadchodzący</Badge> : null}
         </div>
 
-        <div className="grid gap-4 rounded-[28px] bg-zinc-50 p-4 sm:grid-cols-2">
-          <div>
+        <div className="grid grid-cols-2 gap-2 sm:gap-3">
+          <div className="rounded-2xl border border-zinc-200/80 bg-zinc-50 px-3 py-2.5 sm:px-3.5 sm:py-3">
             <p className="text-[0.9rem] font-semibold uppercase tracking-[0.14em] text-zinc-950">Data</p>
             <p className="mt-1 text-base font-semibold text-zinc-950">{formatDate(event.eventDate)}</p>
           </div>
-          <div>
+          <div className="rounded-2xl border border-zinc-200/80 bg-zinc-50 px-3 py-2.5 sm:px-3.5 sm:py-3">
             <p className="text-[0.9rem] font-semibold uppercase tracking-[0.14em] text-zinc-950">Przebieg</p>
             <p className="mt-1 text-base font-semibold text-zinc-950">{formatMileage(event.mileage)}</p>
           </div>
-          <div>
+          <div className="rounded-2xl border border-zinc-200/80 bg-zinc-50 px-3 py-2.5 sm:px-3.5 sm:py-3">
             <p className="text-[0.9rem] font-semibold uppercase tracking-[0.14em] text-zinc-950">Koszt</p>
             <p className="mt-1 text-base font-semibold text-zinc-950">{formatCurrency(getEventTotalCost(event))}</p>
           </div>
-          <div>
+          <div className="rounded-2xl border border-zinc-200/80 bg-zinc-50 px-3 py-2.5 sm:px-3.5 sm:py-3">
             <p className="text-[0.9rem] font-semibold uppercase tracking-[0.14em] text-zinc-950">Załączniki</p>
             <p className="mt-1 text-base font-semibold text-zinc-950">{event.attachmentCount ?? 0}</p>
           </div>
@@ -194,7 +194,7 @@ export function ServiceEventDetail({ event, vehicle, open, onOpenChange, onEdit,
                     <button
                       type="button"
                       data-testid={`attachment-slide-${index}`}
-                      className="flex h-[260px] w-full items-center justify-center overflow-hidden rounded-[24px] border border-zinc-200 bg-zinc-50 text-left transition hover:border-zinc-300 sm:h-[320px]"
+                      className="flex h-[130px] w-full items-center justify-center overflow-hidden rounded-[24px] border border-zinc-200 bg-zinc-50 text-left transition hover:border-zinc-300 sm:h-[160px]"
                       onClick={() => setViewerOpen(true)}
                     >
                       <AttachmentPreview attachment={attachment} />
@@ -213,7 +213,7 @@ export function ServiceEventDetail({ event, vehicle, open, onOpenChange, onEdit,
                     data-testid={`attachment-thumbnail-${index}`}
                     aria-pressed={index === activeAttachmentIndex}
                     className={cn(
-                      'h-20 w-20 shrink-0 overflow-hidden rounded-2xl border bg-zinc-50 transition',
+                      'h-14 shrink-0 aspect-[4/3] overflow-hidden rounded-2xl border bg-zinc-50 p-1 transition sm:h-16',
                       index === activeAttachmentIndex ? 'border-zinc-950 ring-2 ring-zinc-950/10' : 'border-zinc-200 hover:border-zinc-300',
                     )}
                     onClick={() => selectAttachment(index)}
@@ -323,7 +323,7 @@ function AttachmentPreview({ attachment, compact = false, enlarged = false }: { 
       <img
         src={attachment.previewUrl}
         alt={attachment.name}
-        className={cn('h-full w-full bg-zinc-100 object-contain', compact ? 'object-cover' : '', enlarged ? 'max-h-full' : '')}
+        className={cn('h-full w-full bg-zinc-100 object-contain', compact ? 'p-1.5' : '', enlarged ? 'max-h-full' : '')}
       />
     )
   }

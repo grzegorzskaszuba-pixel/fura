@@ -121,7 +121,7 @@ export function ServiceEventList({ tab, vehicle, events, isLoading, onTabChange,
               </span>
             }
             title={tab === 'history' ? 'Ładowanie historii serwisowej...' : 'Ładowanie planu serwisowego...'}
-            description={tab === 'history' ? 'Pobieram wpisy serwisowe dla wybranego auta.' : 'Pobieram zaplanowane wpisy dla wybranego auta.'}
+            description={`Pobieram wpisy dla ${vehicle.name}`}
           />
         ) : events.length === 0 ? (
           <EmptyState
