@@ -42,6 +42,7 @@ interface ServiceEventListProps {
   tab: ServiceTab
   vehicle: Vehicle
   events: ServiceEvent[]
+  isLoading: boolean
   onTabChange: (tab: ServiceTab) => void
   onEventClick: (event: ServiceEvent) => void
 }
@@ -55,7 +56,7 @@ function getMileageIncrease(currentMileage?: number, previousMileage?: number) {
   return increase > 0 ? increase : null
 }
 
-export function ServiceEventList({ tab, vehicle, events, onTabChange, onEventClick }: ServiceEventListProps) {
+export function ServiceEventList({ tab, vehicle, events, isLoading, onTabChange, onEventClick }: ServiceEventListProps) {
   const touchStartX = useRef<number | null>(null)
 
   function handleTouchStart(event: React.TouchEvent<HTMLDivElement>) {
@@ -111,7 +112,13 @@ export function ServiceEventList({ tab, vehicle, events, onTabChange, onEventCli
       </div>
 
       <div onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
-        {events.length === 0 ? (
+        {isLoading ? (
+          <EmptyState
+            icon={<Wrench className="h-6 w-6" />}
+            title={tab === 'history' ? 'Ładowanie historii serwisowej...' : 'Ładowanie planu serwisowego...'}
+            description={tab === 'history' ? 'Pobieram wpisy serwisowe dla wybranego auta.' : 'Pobieram zaplanowane wpisy dla wybranego auta.'}
+          />
+        ) : events.length === 0 ? (
           <EmptyState
             icon={<Wrench className="h-6 w-6" />}
             title={tab === 'history' ? 'Brak historii serwisowej' : 'Brak zaplanowanych serwisów'}

@@ -43,6 +43,7 @@ export default function App() {
   const [vehicles, setVehicles] = useState<Vehicle[]>([])
   const [persistedActiveVehicleId, setPersistedActiveVehicleId] = useState<string | null>(null)
   const [serviceEvents, setServiceEvents] = useState<ServiceEvent[]>([])
+  const [isServiceEventsLoading, setIsServiceEventsLoading] = useState(false)
   const [isBootstrapping, setIsBootstrapping] = useState(true)
   const [appError, setAppError] = useState<string | null>(null)
   const [logoPhaseIndex, setLogoPhaseIndex] = useState(0)
@@ -153,19 +154,38 @@ export default function App() {
 
   useEffect(() => {
     if (!currentProfileId || !activeVehicle?.id) {
+      setIsServiceEventsLoading(false)
       setServiceEvents([])
       return
     }
 
+    let cancelled = false
+
     void (async () => {
+      setIsServiceEventsLoading(true)
+
       try {
         const events = await serviceEventRepository.listByVehicle(currentProfileId, activeVehicle.id)
-        setServiceEvents(events)
+
+        if (!cancelled) {
+          setServiceEvents(events)
+        }
       } catch (error) {
-        setServiceEvents([])
-        setAppError(error instanceof Error ? error.message : 'Nie udało się pobrać historii serwisowej')
+
+        if (!cancelled) {
+          setServiceEvents([])
+          setAppError(error instanceof Error ? error.message : 'Nie udało się pobrać historii serwisowej')
+        }
+      } finally {
+        if (!cancelled) {
+          setIsServiceEventsLoading(false)
+        }
       }
     })()
+
+    return () => {
+      cancelled = true
+    }
   }, [activeVehicle?.id, currentProfileId])
 
   async function handleVehicleSelect(vehicleId: string) {
@@ -498,6 +518,7 @@ export default function App() {
               tab={serviceTab}
               vehicle={activeVehicle}
               events={visibleEvents}
+              isLoading={isServiceEventsLoading}
               onTabChange={setServiceTab}
               onEventClick={(event) => setDetailEventId(event.id)}
             />

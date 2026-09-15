@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { KeyRound } from 'lucide-react'
+import { KeyRound, LoaderCircle } from 'lucide-react'
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
@@ -79,6 +79,7 @@ export function AuthScreen({ onLogin, onRegister, onResetPassword, allowResetPas
               <div className={`grid rounded-2xl bg-zinc-100 p-1 ${allowResetPassword ? 'grid-cols-3' : 'grid-cols-2'}`}>
                 <button
                   type="button"
+                  disabled={isSubmitting}
                   className={`rounded-[14px] px-4 py-3 text-sm font-medium transition ${mode === 'login' ? 'bg-white text-zinc-950 shadow-sm' : 'text-zinc-500'}`}
                   onClick={() => setMode('login')}
                 >
@@ -86,6 +87,7 @@ export function AuthScreen({ onLogin, onRegister, onResetPassword, allowResetPas
                 </button>
                 <button
                   type="button"
+                  disabled={isSubmitting}
                   className={`rounded-[14px] px-4 py-3 text-sm font-medium transition ${mode === 'register' ? 'bg-white text-zinc-950 shadow-sm' : 'text-zinc-500'}`}
                   onClick={() => setMode('register')}
                 >
@@ -94,6 +96,7 @@ export function AuthScreen({ onLogin, onRegister, onResetPassword, allowResetPas
                 {allowResetPassword ? (
                   <button
                     type="button"
+                    disabled={isSubmitting}
                     className={`rounded-[14px] px-4 py-3 text-sm font-medium transition ${mode === 'reset' ? 'bg-white text-zinc-950 shadow-sm' : 'text-zinc-500'}`}
                     onClick={() => setMode('reset')}
                   >
@@ -105,7 +108,7 @@ export function AuthScreen({ onLogin, onRegister, onResetPassword, allowResetPas
               <form className="space-y-4" onSubmit={form.handleSubmit(handleSubmit)}>
                 <div className="space-y-2">
                   <Label htmlFor="username">Nazwa użytkownika</Label>
-                  <Input id="username" placeholder="np. kierowca01" {...form.register('username')} />
+                  <Input id="username" placeholder="np. kierowca01" disabled={isSubmitting} {...form.register('username')} />
                   {form.formState.errors.username ? (
                     <p className="text-sm text-red-600">{form.formState.errors.username.message}</p>
                   ) : null}
@@ -113,7 +116,7 @@ export function AuthScreen({ onLogin, onRegister, onResetPassword, allowResetPas
 
                 <div className="space-y-2">
                   <Label htmlFor="password">{mode === 'reset' ? 'Nowe hasło' : 'Hasło'}</Label>
-                  <Input id="password" type="password" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} {...form.register('password')} />
+                  <Input id="password" type="password" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} disabled={isSubmitting} {...form.register('password')} />
                   {form.formState.errors.password ? (
                     <p className="text-sm text-red-600">{form.formState.errors.password.message}</p>
                   ) : null}
@@ -122,7 +125,7 @@ export function AuthScreen({ onLogin, onRegister, onResetPassword, allowResetPas
                 {mode === 'register' ? (
                   <div className="space-y-2">
                     <Label htmlFor="displayName">Nazwa wyświetlana</Label>
-                    <Input id="displayName" placeholder="np. Mój profil" {...form.register('displayName')} />
+                    <Input id="displayName" placeholder="np. Mój profil" disabled={isSubmitting} {...form.register('displayName')} />
                   </div>
                 ) : null}
 
@@ -130,8 +133,18 @@ export function AuthScreen({ onLogin, onRegister, onResetPassword, allowResetPas
 
                 <div className="flex flex-col gap-3 pt-2">
                   <Button type="submit" size="lg" disabled={isSubmitting}>
-                    <KeyRound className="h-4 w-4" />
-                    {mode === 'login' ? 'Zaloguj' : mode === 'register' ? 'Utwórz profil' : 'Zresetuj hasło'}
+                    {isSubmitting ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}
+                    {isSubmitting
+                      ? mode === 'login'
+                        ? 'Trwa logowanie...'
+                        : mode === 'register'
+                          ? 'Tworzenie profilu...'
+                          : 'Resetowanie hasła...'
+                      : mode === 'login'
+                        ? 'Zaloguj'
+                        : mode === 'register'
+                          ? 'Utwórz profil'
+                          : 'Zresetuj hasło'}
                   </Button>
                 </div>
               </form>
