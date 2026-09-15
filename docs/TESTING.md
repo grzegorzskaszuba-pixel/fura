@@ -1,18 +1,125 @@
 # TESTING
 
-## Cel
+## 1. Cel dokumentu
 
-System testow ma byc prosty na start, ale stale rozwijany. Kazda nowa funkcja i kazda poprawka regresji powinna dopisac lub zaktualizowac testy.
+Ten dokument opisuje strategie testowania AUTOlog (Carlog/Fura), standardy jakosci testow, warstwy pokrycia oraz bramki jakosci dla zmian frontend i backend.
 
-## Warstwy testow
+Cel praktyczny:
 
-- backend unit: logika domenowa backendu bez HTTP (np. auth-core)
-- API integration: endpointy HTTP i sesje (autoryzacja, profile scope)
-- frontend integration: UI i warstwa danych po stronie aplikacji (Vitest + RTL)
-- functional e2e: krytyczne flow uzytkownika (Playwright)
-- regression: testy pod konkretne bledy, ktore juz kiedys wystapily
+- szybkie wykrywanie regresji funkcjonalnych i security
+- utrzymanie stabilnosci API i UI podczas iteracji MVP
+- przewidywalny proces walidacji zmian przed mergem i release
 
-## Komendy
+## 2. Zasady nadrzedne
+
+- kazda zmiana funkcjonalna wymaga testu adekwatnego do warstwy ryzyka
+- kazdy naprawiany bug wymaga testu regresyjnego
+- testy powinny chronic zachowanie biznesowe, a nie przypadkowe detale implementacji
+- suite testowe musza byc deterministyczne, niezalezne i powtarzalne
+
+## 3. Stack i konfiguracja testow
+
+Narzedzia:
+
+- Vitest - testy unit i integration
+- React Testing Library - testy UI
+- Playwright - testy end-to-end
+- jsdom - srodowisko testowe frontendu
+- fake-indexeddb - wsparcie dla scenariuszy lokalnych/testowych
+
+Konfiguracja:
+
+- `vite.config.ts`: konfiguracja Vitest (`environment`, `setupFiles`, `include`)
+- `src/test/setup.ts`: setup globalny testow frontend
+- `playwright.config.ts`: konfiguracja E2E
+
+## 4. Warstwy testow
+
+### 4.1 Backend unit
+
+Cel:
+
+- izolowane testowanie logiki domenowej auth bez transportu HTTP
+
+Zakres:
+
+- rejestracja, logowanie, walidacja hasel
+- reset i zmiana hasla
+- oczekiwane bledy domenowe
+
+Przyklad:
+
+- `server/test/auth-core.unit.test.ts`
+
+### 4.2 API integration
+
+Cel:
+
+- weryfikacja kontraktow endpointow, sesji i autoryzacji rekordow
+
+Zakres:
+
+- kody odpowiedzi i payloady
+- ochrona endpointow przy braku sesji
+- izolacja profilu i blokady dostepu do obcych danych
+- CRUD dla `vehicles` i `service-events`
+
+Przyklady:
+
+- `server/test/auth-api.integration.test.ts`
+- `server/test/data-api.integration.test.ts`
+
+### 4.3 Frontend integration
+
+Cel:
+
+- testowanie zachowania UI i przeplywow formularzy z perspektywy uzytkownika
+
+Zakres:
+
+- ekran auth, walidacja i obsluga bledow
+- przeplyw pracy z pojazdami i wpisami serwisowymi
+- izolacja widokow i danych profilu
+
+Przyklady:
+
+- `src/test/app.test.tsx`
+- `src/test/repositories.test.ts`
+- `src/test/profile-isolation.regression.test.tsx`
+- `src/test/auth-screen.regression.test.tsx`
+
+### 4.4 Regression tests
+
+Cel:
+
+- utrzymanie stalej ochrony przed ponownym wystapieniem znanych bledow
+
+Regula:
+
+- kazdy istotny bug produkcyjny lub security musi pozostawic po sobie test regresyjny
+
+Przyklad:
+
+- `server/test/auth-security.regression.test.ts`
+
+### 4.5 E2E (functional)
+
+Cel:
+
+- potwierdzenie krytycznych scenariuszy biznesowych na poziomie calej aplikacji
+
+Zakres:
+
+- mobile-first smoke flow
+- kluczowe scenariusze uzytkownika koncowego
+
+Przyklad:
+
+- `tests/e2e/mobile.spec.ts`
+
+## 5. Komendy uruchamiania testow
+
+Podstawowe komendy:
 
 ```bash
 npm run test
@@ -23,40 +130,117 @@ npm run test:regression
 npm run test:functional
 npm run test:e2e
 npm run test:all
+```
+
+Bramki jakosci:
+
+```bash
 npm run verify
 npm run verify:full
 ```
 
-## Startowy zakres
+Znaczenie bramek:
 
-- backend unit: rejestracja/logowanie/zmiana hasla (auth core)
-- API integration: izolacja profilu sesji, brak switch-profile, ochrona resetu hasla
-- frontend integration: glowny flow MVP (auta, historia/plan, formularze)
-- regression: brak podgladu obcych profili w menu uzytkownika
-- e2e: mobile-first smoke flow
+- `verify`: lint + typecheck + test + build
+- `verify:full`: `verify` + Playwright E2E
 
-## Zasada rozbudowy
+## 6. Strategia doboru testu do zmiany
+
+Dobieraj warstwe najnizej, na ktorej mozna wiarygodnie wykryc problem:
+
+- logika czysta -> backend unit
+- kontrakt HTTP / sesja / autoryzacja -> API integration
+- zachowanie komponentu i formularza -> frontend integration
+- przeplyw cross-modulowy i runtime -> E2E
+
+To podejscie minimalizuje koszt utrzymania testow i skraca feedback loop.
+
+## 7. Standardy jakosci testow
+
+Wymagania dla nowych testow:
+
+- czytelny model Arrange-Act-Assert
+- brak zaleznosci miedzy przypadkami testowymi
+- deterministyczne dane i stan poczatkowy
+- asercje na zachowanie biznesowe i kontrakty
+- brak flaky source (przypadkowe timeouty, niestabilne selektory)
+
+Praktyki zalecane:
+
+- test names opisujace efekt biznesowy
+- minimalna liczba mockow tam, gdzie mozliwa jest lekka integracja
+- dla security bugfixow: test negatywny + test pozytywny
+
+## 8. Coverage minimalne (MVP+)
+
+### 8.1 Auth
+
+- register/login/session/logout
+- change-password i ochrona reset-password
+- przypadki braku sesji i niepoprawnych danych
+
+### 8.2 Data API
+
+- profile scope isolation
+- vehicle CRUD z autoryzacja
+- service-event CRUD z autoryzacja i walidacja payloadow
+
+### 8.3 Frontend
+
+- ekran auth i handling bledow API
+- scenariusze dodawania/edycji/usuwania pojazdu
+- scenariusze dodawania/edycji/usuwania wpisu
+- puste stany i podstawowa nawigacja widokow
+
+### 8.4 Regression
+
+- stale utrzymanie testow dla wykrytych incydentow
+- zero usuwania testu regresyjnego bez zamiennika
+
+## 9. Procedura dla PR
 
 Przy kazdej zmianie kodu:
 
-1. dodaj lub zaktualizuj co najmniej 1 test w najbardziej adekwatnej warstwie,
-2. jesli naprawiasz bug, dodaj test regresyjny,
-3. uruchom minimum `npm run test` i warstwe, ktorej dotyczy zmiana,
-4. przed mergem uruchom `npm run verify`.
+1. Okresl warstwy ryzyka (auth/API/UI/E2E).
+2. Dodaj lub zaktualizuj testy adekwatne do zmiany.
+3. Uruchom minimum `npm run test` oraz suite dotkniete zmiana.
+4. Przed merge uruchom `npm run verify`.
+5. Dla zmian krytycznych auth/API lub flow uzytkownika uruchom `npm run verify:full`.
 
-Przy duzych zmianach (nie kosmetycznych), nowych feature i zmianach w auth/API:
+## 10. CI i quality gates
 
-1. uruchom lokalnie `npm run verify:full`,
-2. upewnij sie, ze PR zawiera aktualizacje testow warstwy dotknietej zmiana,
-3. jesli zmiana dotyka flow uzytkownika, dodaj lub rozszerz test E2E.
+Minimalne wymagania CI:
 
-## CI i bramki
+- lint
+- typecheck
+- Vitest suites
+- E2E dla zmian aplikacyjnych lub recznie wymuszonych
 
-- workflow CI uruchamia lint, typecheck i pelny Vitest na push/PR,
-- testy E2E uruchamiaja sie automatycznie dla zmian aplikacyjnych (`src`, `server`, `tests`, `scripts`, konfiguracja),
-- E2E mozna wymusic recznie przez `workflow_dispatch` z `run_e2e=true`.
+Wymagania merge:
 
-## Uwagi
+- zielone testy warstwy dotknietej zmiana
+- aktualizacja testow przy zmianie zachowania
+- dodany test regresyjny przy naprawie bledow
 
-- `npm run test` uruchamia testy Vitest (frontend + backend)
-- `npm run test:e2e` uruchamia Playwright na osobnym serwerze
+## 11. Ryzyka testowe i mitigacje
+
+Typowe ryzyka:
+
+- flaky E2E przez niestabilne selektory i timeouty
+- luki w testach negatywnych auth i autoryzacji
+- rozjazd dokumentacji testowej i rzeczywistego workflow
+
+Mitigacje:
+
+- standaryzacja selektorow i helperow testowych
+- regularny przeglad suite regresyjnych
+- utrzymywanie dokumentu w zgodzie z aktualnymi skryptami i konfiguracja
+
+## 12. Kryterium Done dla testow
+
+Zmiana jest gotowa, gdy:
+
+- testy sa dodane lub zaktualizowane adekwatnie do zakresu zmiany
+- lokalne suite przechodza dla dotknietej warstwy
+- bramka `verify` (lub `verify:full` dla zmian krytycznych) jest zielona
+- dokumentacja testowa pozostaje zgodna z implementacja
