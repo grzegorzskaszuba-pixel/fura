@@ -202,7 +202,7 @@ export function ServiceEventList({ tab, vehicle, events, isLoading, onTabChange,
                               {event.attachmentCount ?? 0}
                             </button>
                           ) : (
-                            <div className="flex items-center gap-1 text-sm text-zinc-500">
+                            <div className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-sm text-zinc-500">
                               <FileText className="h-4 w-4" />
                               0
                             </div>
