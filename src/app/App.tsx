@@ -1,8 +1,10 @@
-import { CarFront, Pencil, Plus, Trash2, Wrench } from 'lucide-react'
+import { CarFront, Pencil, Plus, Share2, Trash2, Wrench } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 
 import { appStateRepository } from '@/data/repositories/app-state-repository'
 import { profileRepository } from '@/data/repositories/profile-repository'
+import type { ActiveShareBrochure } from '@/data/repositories/share-brochure-repository'
+import { shareBrochureRepository } from '@/data/repositories/share-brochure-repository'
 import { serviceEventRepository } from '@/data/repositories/service-event-repository'
 import { vehicleRepository } from '@/data/repositories/vehicle-repository'
 import { authService } from '@/features/auth/auth-service-factory'
@@ -13,6 +15,7 @@ import { ServiceEventDetail } from '@/features/service-events/service-event-deta
 import { ServiceEventForm } from '@/features/service-events/service-event-form'
 import { ServiceEventList } from '@/features/service-events/service-event-list'
 import { ServiceSummary } from '@/features/service-events/service-summary'
+import { ShareBrochureModal } from '@/features/vehicles/share-brochure-modal'
 import { VehicleCarousel } from '@/features/vehicles/vehicle-carousel'
 import { VehicleForm } from '@/features/vehicles/vehicle-form'
 import { EmptyState } from '@/shared/components/empty-state'
@@ -48,6 +51,13 @@ export default function App() {
   const [appError, setAppError] = useState<string | null>(null)
   const [logoPhaseIndex, setLogoPhaseIndex] = useState(0)
   const [deleteVehicleDialogOpen, setDeleteVehicleDialogOpen] = useState(false)
+  const [shareModalOpen, setShareModalOpen] = useState(false)
+  const [shareUrl, setShareUrl] = useState<string | null>(null)
+  const [shareExpiresAt, setShareExpiresAt] = useState<string | null>(null)
+  const [shareError, setShareError] = useState<string | null>(null)
+  const [isShareGenerating, setIsShareGenerating] = useState(false)
+  const [activeShareLinks, setActiveShareLinks] = useState<ActiveShareBrochure[]>([])
+  const [isShareLinksLoading, setIsShareLinksLoading] = useState(false)
 
   const activeVehicle = useMemo(() => vehicles.find((vehicle) => vehicle.id === activeVehicleId) ?? vehicles[0] ?? null, [activeVehicleId, vehicles])
   const editingVehicle = useMemo(() => vehicles.find((vehicle) => vehicle.id === editingVehicleId) ?? null, [editingVehicleId, vehicles])
@@ -141,6 +151,15 @@ export default function App() {
 
     setActiveVehicleId(vehicles[0]?.id ?? null)
   }, [currentProfileId, persistedActiveVehicleId, vehicles])
+
+  useEffect(() => {
+    setShareUrl(null)
+    setShareExpiresAt(null)
+    setShareError(null)
+    setShareModalOpen(false)
+    setActiveShareLinks([])
+    setIsShareLinksLoading(false)
+  }, [activeVehicle?.id])
 
   useEffect(() => {
     if (!currentProfileId || vehicles.length === 0) {
@@ -383,11 +402,73 @@ export default function App() {
     setEditingEventId(null)
     setDetailEventId(null)
     setProfileSettingsOpen(false)
+    setShareModalOpen(false)
+    setShareUrl(null)
+    setShareExpiresAt(null)
+    setShareError(null)
+    setActiveShareLinks([])
+    setIsShareLinksLoading(false)
 
     try {
       await authService.logout()
     } catch (error) {
       setAppError(error instanceof Error ? error.message : 'Wylogowano lokalnie, ale nie udało się zamknąć wszystkich sesji na serwerze.')
+    }
+  }
+
+  async function loadActiveShareLinks(vehicleId: string, preferredShareId?: string) {
+    setIsShareLinksLoading(true)
+
+    try {
+      const links = await shareBrochureRepository.listActive(vehicleId)
+      setActiveShareLinks(links)
+
+      const selected = preferredShareId ? links.find((link) => link.id === preferredShareId) ?? null : links[0] ?? null
+
+      if (selected) {
+        setShareUrl(selected.url)
+        setShareExpiresAt(selected.expiresAt)
+      } else {
+        setShareUrl(null)
+        setShareExpiresAt(null)
+      }
+    } catch (error) {
+      setShareError(error instanceof Error ? error.message : 'Nie udalo sie pobrac listy aktywnych linkow.')
+    } finally {
+      setIsShareLinksLoading(false)
+    }
+  }
+
+  async function handleGenerateShareBrochure() {
+    if (!activeVehicle) {
+      return
+    }
+
+    setShareError(null)
+    setIsShareGenerating(true)
+
+    try {
+      const share = await shareBrochureRepository.create(activeVehicle.id)
+      await loadActiveShareLinks(activeVehicle.id, share.id)
+    } catch (error) {
+      setShareError(error instanceof Error ? error.message : 'Nie udalo sie wygenerowac linku do udostepnienia.')
+    } finally {
+      setIsShareGenerating(false)
+    }
+  }
+
+  async function handleRevokeShareBrochure(shareId: string) {
+    if (!activeVehicle) {
+      return
+    }
+
+    setShareError(null)
+
+    try {
+      await shareBrochureRepository.revoke(shareId)
+      await loadActiveShareLinks(activeVehicle.id)
+    } catch (error) {
+      setShareError(error instanceof Error ? error.message : 'Nie udalo sie uniewaznic linku.')
     }
   }
 
@@ -440,6 +521,17 @@ export default function App() {
                   >
                     <Plus className="mr-2 h-4 w-4" />
                     Dodaj nowe
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onSelect={() => {
+                      setShareError(null)
+                      setShareModalOpen(true)
+                      void loadActiveShareLinks(activeVehicle.id)
+                    }}
+                  >
+                    <Share2 className="mr-2 h-4 w-4" />
+                    Podziel sie
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem className="text-red-600 focus:bg-red-50 focus:text-red-700" onSelect={() => setDeleteVehicleDialogOpen(true)}>
@@ -569,6 +661,26 @@ export default function App() {
         initialValues={editingVehicle}
         onSubmit={handleVehicleSave}
       />
+
+      {activeVehicle ? (
+        <ShareBrochureModal
+          open={shareModalOpen}
+          onOpenChange={setShareModalOpen}
+          vehicleName={activeVehicle.name}
+          shareUrl={shareUrl}
+          expiresAt={shareExpiresAt}
+          activeLinks={activeShareLinks}
+          isLoadingLinks={isShareLinksLoading}
+          isGenerating={isShareGenerating}
+          error={shareError}
+          onGenerate={handleGenerateShareBrochure}
+          onSelectLink={(link) => {
+            setShareUrl(link.url)
+            setShareExpiresAt(link.expiresAt)
+          }}
+          onRevoke={handleRevokeShareBrochure}
+        />
+      ) : null}
 
       <ServiceEventForm
         open={serviceFormOpen}

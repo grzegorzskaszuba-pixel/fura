@@ -26,6 +26,9 @@ const ALLOWED_ORIGINS = String(process.env.AUTH_API_ALLOWED_ORIGINS ?? '*')
 const sessions = new Map()
 const startedAt = new Date().toISOString()
 let cachedLegacyState = null
+const SHARE_BROCHURE_TTL_MS = 24 * 60 * 60 * 1000
+const MAX_SHARED_HISTORY_ITEMS = 30
+const MAX_ACTIVE_SHARE_LINKS_PER_VEHICLE = 5
 
 function isInputError(error) {
   if (!(error instanceof Error)) {
@@ -103,6 +106,17 @@ function setJson(response, statusCode, payload) {
     'Cache-Control': 'no-store',
   })
   response.end(JSON.stringify(payload))
+}
+
+function setHtml(response, statusCode, html) {
+  response.writeHead(statusCode, {
+    'Content-Type': 'text/html; charset=utf-8',
+    'Cache-Control': 'no-store',
+    'X-Frame-Options': 'DENY',
+    'Referrer-Policy': 'no-referrer',
+    'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+  })
+  response.end(html)
 }
 
 function readCookies(request) {
@@ -272,6 +286,347 @@ function normalizeNumber(value) {
   return Number.isNaN(parsed) ? undefined : parsed
 }
 
+function createShareBrochureId() {
+  return crypto.randomBytes(24).toString('hex')
+}
+
+function computeEventCost(event) {
+  return Number(event.partsCost ?? 0) + Number(event.laborCost ?? 0) + Number(event.otherCost ?? 0)
+}
+
+function formatPlCurrency(value) {
+  return new Intl.NumberFormat('pl-PL', {
+    style: 'currency',
+    currency: 'PLN',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value)
+}
+
+function formatPlDate(value) {
+  if (!value) {
+    return 'Bez daty'
+  }
+
+  const parsed = new Date(value)
+
+  if (Number.isNaN(parsed.getTime())) {
+    return 'Bez daty'
+  }
+
+  return new Intl.DateTimeFormat('pl-PL', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(parsed)
+}
+
+function formatMileage(value) {
+  if (typeof value !== 'number' || Number.isNaN(value)) {
+    return 'Brak danych'
+  }
+
+  return `${new Intl.NumberFormat('pl-PL').format(value)} km`
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;')
+}
+
+function mapPublicVehicle(vehicle) {
+  return {
+    name: vehicle.name,
+    make: vehicle.make,
+    model: vehicle.model,
+    year: vehicle.year,
+    currentMileage: vehicle.currentMileage,
+  }
+}
+
+function mapPublicEvents(events) {
+  return events
+    .filter((event) => event.status === 'completed')
+    .sort((left, right) => {
+      const rightDate = right.eventDate ? new Date(right.eventDate).getTime() : 0
+      const leftDate = left.eventDate ? new Date(left.eventDate).getTime() : 0
+
+      if (rightDate !== leftDate) {
+        return rightDate - leftDate
+      }
+
+      return Number(right.mileage ?? 0) - Number(left.mileage ?? 0)
+    })
+    .slice(0, MAX_SHARED_HISTORY_ITEMS)
+    .map((event) => ({
+      title: event.title,
+      category: event.category,
+      eventDate: event.eventDate,
+      mileage: event.mileage,
+      workshopName: event.workshopName,
+      totalCost: computeEventCost(event),
+      description: event.description,
+    }))
+}
+
+function createBrochurePayload(vehicle, events, createdAt, expiresAt) {
+  const publicEvents = mapPublicEvents(events)
+  const totalCost = publicEvents.reduce((sum, event) => sum + event.totalCost, 0)
+
+  return {
+    generatedAt: createdAt,
+    expiresAt,
+    vehicle: mapPublicVehicle(vehicle),
+    summary: {
+      eventsCount: publicEvents.length,
+      totalCost,
+    },
+    events: publicEvents,
+  }
+}
+
+function isExpired(isoString) {
+  const timestamp = new Date(isoString).getTime()
+
+  if (Number.isNaN(timestamp)) {
+    return true
+  }
+
+  return timestamp <= Date.now()
+}
+
+function buildPublicShareUrl(request, requestUrl, shareId) {
+  const forwardedProtoHeader = typeof request.headers['x-forwarded-proto'] === 'string' ? request.headers['x-forwarded-proto'] : ''
+  const forwardedHostHeader = typeof request.headers['x-forwarded-host'] === 'string' ? request.headers['x-forwarded-host'] : ''
+  const protocol = (forwardedProtoHeader.split(',')[0] ?? '').trim() || requestUrl.protocol.replace(':', '') || 'http'
+  const host = (forwardedHostHeader.split(',')[0] ?? '').trim() || String(request.headers.host ?? '').trim()
+  const path = `/api/public-share/${shareId}`
+
+  if (!host) {
+    return path
+  }
+
+  return `${protocol}://${host}${path}`
+}
+
+function toShareBrochureListItem(request, requestUrl, brochure) {
+  return {
+    id: brochure.id,
+    vehicleId: brochure.vehicleId,
+    createdAt: brochure.createdAt,
+    expiresAt: brochure.expiresAt,
+    url: buildPublicShareUrl(request, requestUrl, brochure.id),
+  }
+}
+
+async function cleanupExpiredShareBrochures() {
+  if (isPostgresStorage()) {
+    await postgresQuery('DELETE FROM share_brochures WHERE expires_at <= NOW()')
+    return
+  }
+
+  const state = await readState()
+  const nextBrochures = (state.shareBrochures ?? []).filter((entry) => !isExpired(entry.expiresAt))
+
+  if (nextBrochures.length === (state.shareBrochures ?? []).length) {
+    return
+  }
+
+  state.shareBrochures = nextBrochures
+  await writeState(state)
+}
+
+function renderShareBrochureHtml(snapshot) {
+  const vehicleTitle = [snapshot.vehicle.make, snapshot.vehicle.model].filter(Boolean).join(' ')
+  const subtitleParts = [snapshot.vehicle.year, formatMileage(snapshot.vehicle.currentMileage)].filter(Boolean)
+
+  const rows = snapshot.events
+    .map((event) => {
+      const workshopLine = event.workshopName ? `<p class="muted">Warsztat: ${escapeHtml(event.workshopName)}</p>` : ''
+      const descriptionLine = event.description ? `<p class="muted">${escapeHtml(event.description)}</p>` : ''
+
+      return `
+        <article class="event-card">
+          <div class="event-top">
+            <p class="event-title">${escapeHtml(event.title)}</p>
+            <p class="event-cost">${escapeHtml(formatPlCurrency(event.totalCost))}</p>
+          </div>
+          <p class="muted">${escapeHtml(formatPlDate(event.eventDate))} • ${escapeHtml(formatMileage(event.mileage))}</p>
+          <p class="chip">${escapeHtml(event.category)}</p>
+          ${workshopLine}
+          ${descriptionLine}
+        </article>
+      `
+    })
+    .join('')
+
+  const emptyState = snapshot.events.length === 0 ? '<p class="empty">Brak wykonanych wpisow serwisowych do udostepnienia.</p>' : rows
+
+  return `<!doctype html>
+<html lang="pl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>FURA • Historia serwisowa</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f5f5f4;
+        --card: #ffffff;
+        --ink: #111827;
+        --muted: #52525b;
+        --line: #e4e4e7;
+        --accent: #ea580c;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        background: radial-gradient(circle at top, #fff7ed 0%, var(--bg) 60%);
+        color: var(--ink);
+      }
+      .wrap {
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 24px 16px 56px;
+      }
+      .hero {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 24px;
+        padding: 20px;
+        box-shadow: 0 10px 35px rgba(15, 23, 42, 0.06);
+      }
+      .badge {
+        display: inline-block;
+        padding: 6px 10px;
+        font-size: 12px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        border-radius: 999px;
+        background: #fff7ed;
+        color: var(--accent);
+      }
+      h1 {
+        margin: 12px 0 6px;
+        font-size: clamp(24px, 4.8vw, 38px);
+        letter-spacing: -0.04em;
+      }
+      .muted { margin: 4px 0 0; color: var(--muted); }
+      .grid {
+        margin-top: 14px;
+        display: grid;
+        gap: 10px;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .stat {
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        padding: 12px;
+        background: #fafafa;
+      }
+      .stat-label {
+        margin: 0;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: var(--muted);
+      }
+      .stat-value {
+        margin: 6px 0 0;
+        font-size: 18px;
+        font-weight: 600;
+        letter-spacing: -0.03em;
+      }
+      .events {
+        margin-top: 18px;
+        display: grid;
+        gap: 12px;
+      }
+      .event-card {
+        border-radius: 18px;
+        border: 1px solid var(--line);
+        background: var(--card);
+        padding: 14px;
+      }
+      .event-top {
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+      }
+      .event-title {
+        margin: 0;
+        font-size: 17px;
+        font-weight: 600;
+        letter-spacing: -0.02em;
+      }
+      .event-cost {
+        margin: 0;
+        white-space: nowrap;
+        color: var(--accent);
+        font-weight: 700;
+      }
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        margin-top: 8px;
+        border-radius: 999px;
+        background: #f4f4f5;
+        color: #3f3f46;
+        padding: 5px 10px;
+        font-size: 12px;
+      }
+      .empty {
+        border: 1px dashed var(--line);
+        border-radius: 18px;
+        background: #fff;
+        color: var(--muted);
+        padding: 18px;
+      }
+      footer {
+        margin-top: 18px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      @media (max-width: 640px) {
+        .grid { grid-template-columns: 1fr; }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="wrap">
+      <section class="hero">
+        <span class="badge">FURA • Publiczny podglad</span>
+        <h1>${escapeHtml(vehicleTitle || snapshot.vehicle.name || 'Pojazd')}</h1>
+        <p class="muted">${escapeHtml(snapshot.vehicle.name || '')}</p>
+        <p class="muted">${escapeHtml(subtitleParts.filter((part) => String(part).length > 0).join(' • '))}</p>
+
+        <div class="grid">
+          <article class="stat">
+            <p class="stat-label">Wpisy serwisowe</p>
+            <p class="stat-value">${escapeHtml(String(snapshot.summary.eventsCount))}</p>
+          </article>
+          <article class="stat">
+            <p class="stat-label">Suma kosztow</p>
+            <p class="stat-value">${escapeHtml(formatPlCurrency(snapshot.summary.totalCost))}</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="events">${emptyState}</section>
+
+      <footer>
+        Wygenerowano: ${escapeHtml(formatPlDate(snapshot.generatedAt))}. Link wygasa: ${escapeHtml(formatPlDate(snapshot.expiresAt))}.
+      </footer>
+    </main>
+  </body>
+</html>`
+}
+
 function mapProfileRow(row) {
   return {
     id: row.id,
@@ -425,6 +780,55 @@ async function handleAuthRequest(request, response) {
   const pathname = requestUrl.pathname
   const method = request.method ?? 'GET'
 
+  if (pathname.startsWith('/api/public-share/') && method === 'GET') {
+    await cleanupExpiredShareBrochures()
+    const shareId = pathname.slice('/api/public-share/'.length).trim()
+
+    if (!shareId) {
+      setHtml(response, 404, '<h1>Not found</h1>')
+      return
+    }
+
+    if (isPostgresStorage()) {
+      const result = await postgresQuery('SELECT payload, expires_at FROM share_brochures WHERE id = $1 LIMIT 1', [shareId])
+      const row = result.rows[0]
+
+      if (!row) {
+        setHtml(response, 404, '<h1>Ten link nie istnieje lub wygasl.</h1>')
+        return
+      }
+
+      const expiresAt = row.expires_at
+
+      if (isExpired(expiresAt)) {
+        await postgresQuery('DELETE FROM share_brochures WHERE id = $1', [shareId])
+        setHtml(response, 410, '<h1>Ten link wygasl.</h1>')
+        return
+      }
+
+      setHtml(response, 200, renderShareBrochureHtml(row.payload ?? {}))
+      return
+    }
+
+    const state = await readState()
+    const brochure = (state.shareBrochures ?? []).find((entry) => entry.id === shareId)
+
+    if (!brochure) {
+      setHtml(response, 404, '<h1>Ten link nie istnieje lub wygasl.</h1>')
+      return
+    }
+
+    if (isExpired(brochure.expiresAt)) {
+      state.shareBrochures = (state.shareBrochures ?? []).filter((entry) => entry.id !== shareId)
+      await writeState(state)
+      setHtml(response, 410, '<h1>Ten link wygasl.</h1>')
+      return
+    }
+
+    setHtml(response, 200, renderShareBrochureHtml(brochure.payload ?? {}))
+    return
+  }
+
   if (pathname === '/api/health' && method === 'GET') {
     setJson(response, 200, {
       ok: true,
@@ -477,6 +881,69 @@ async function handleAuthRequest(request, response) {
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
 
     setJson(response, 200, { vehicles })
+    return
+  }
+
+  if (pathname === '/api/share-brochures' && method === 'GET') {
+    const profileId = getAuthenticatedProfileId(request)
+
+    if (!profileId) {
+      setJson(response, 401, { message: 'Brak aktywnej sesji' })
+      return
+    }
+
+    await cleanupExpiredShareBrochures()
+    const vehicleIdFilter = String(requestUrl.searchParams.get('vehicleId') ?? '').trim()
+
+    if (isPostgresStorage()) {
+      if (vehicleIdFilter) {
+        const vehicleResult = await postgresQuery('SELECT id FROM vehicles WHERE id = $1 AND profile_id = $2 LIMIT 1', [vehicleIdFilter, profileId])
+
+        if (!vehicleResult.rows[0]) {
+          setJson(response, 404, { message: 'Vehicle not found' })
+          return
+        }
+      }
+
+      const result = vehicleIdFilter
+        ? await postgresQuery(
+            'SELECT id, vehicle_id, created_at, expires_at FROM share_brochures WHERE profile_id = $1 AND vehicle_id = $2 ORDER BY created_at DESC',
+            [profileId, vehicleIdFilter],
+          )
+        : await postgresQuery(
+            'SELECT id, vehicle_id, created_at, expires_at FROM share_brochures WHERE profile_id = $1 ORDER BY created_at DESC',
+            [profileId],
+          )
+
+      const brochures = result.rows.map((row) =>
+        toShareBrochureListItem(request, requestUrl, {
+          id: row.id,
+          vehicleId: row.vehicle_id,
+          createdAt: row.created_at,
+          expiresAt: row.expires_at,
+        }),
+      )
+
+      setJson(response, 200, { brochures })
+      return
+    }
+
+    const state = await readState()
+    const ownVehicleIds = new Set(state.vehicles.filter((vehicle) => vehicle.profileId === profileId).map((vehicle) => vehicle.id))
+
+    if (vehicleIdFilter && !ownVehicleIds.has(vehicleIdFilter)) {
+      setJson(response, 404, { message: 'Vehicle not found' })
+      return
+    }
+
+    const brochures = (state.shareBrochures ?? [])
+      .filter((entry) => entry.profileId === profileId)
+      .filter((entry) => (vehicleIdFilter ? entry.vehicleId === vehicleIdFilter : true))
+      .filter((entry) => ownVehicleIds.has(entry.vehicleId))
+      .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
+      .map((entry) => toShareBrochureListItem(request, requestUrl, entry))
+
+    setJson(response, 200, { brochures })
     return
   }
 
@@ -767,6 +1234,7 @@ async function handleAuthRequest(request, response) {
 
     state.vehicles = state.vehicles.filter((entry) => entry.id !== vehicleId)
     state.serviceEvents = state.serviceEvents.filter((entry) => entry.vehicleId !== vehicleId)
+    state.shareBrochures = (state.shareBrochures ?? []).filter((entry) => entry.vehicleId !== vehicleId)
     await writeState(state)
     setJson(response, 200, { ok: true })
     return
@@ -817,6 +1285,155 @@ async function handleAuthRequest(request, response) {
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
 
     setJson(response, 200, { events })
+    return
+  }
+
+  if (pathname === '/api/share-brochures' && method === 'POST') {
+    const profileId = getAuthenticatedProfileId(request)
+
+    if (!profileId) {
+      setJson(response, 401, { message: 'Brak aktywnej sesji' })
+      return
+    }
+
+    const payload = await readJsonBody(request)
+    const vehicleId = String(payload.vehicleId ?? '').trim()
+
+    if (!vehicleId) {
+      setJson(response, 400, { message: 'Brak vehicleId' })
+      return
+    }
+
+    await cleanupExpiredShareBrochures()
+    const createdAt = new Date().toISOString()
+    const expiresAt = new Date(Date.now() + SHARE_BROCHURE_TTL_MS).toISOString()
+    const id = createShareBrochureId()
+
+    if (isPostgresStorage()) {
+      const vehicleResult = await postgresQuery('SELECT * FROM vehicles WHERE id = $1 AND profile_id = $2 LIMIT 1', [vehicleId, profileId])
+      const vehicleRow = vehicleResult.rows[0]
+
+      if (!vehicleRow) {
+        setJson(response, 404, { message: 'Vehicle not found' })
+        return
+      }
+
+      const activeCountResult = await postgresQuery(
+        'SELECT COUNT(*)::int AS active_count FROM share_brochures WHERE profile_id = $1 AND vehicle_id = $2 AND expires_at > NOW()',
+        [profileId, vehicleId],
+      )
+      const activeCount = Number(activeCountResult.rows[0]?.active_count ?? 0)
+
+      if (activeCount >= MAX_ACTIVE_SHARE_LINKS_PER_VEHICLE) {
+        setJson(response, 429, { message: `Mozesz miec maksymalnie ${MAX_ACTIVE_SHARE_LINKS_PER_VEHICLE} aktywnych linkow dla jednego auta.` })
+        return
+      }
+
+      const eventResult = await postgresQuery(
+        'SELECT * FROM service_events WHERE profile_id = $1 AND vehicle_id = $2 AND status = $3 ORDER BY updated_at DESC',
+        [profileId, vehicleId, 'completed'],
+      )
+
+      const vehicle = mapVehicleRow(vehicleRow)
+      const events = eventResult.rows.map(mapServiceEventRow)
+      const snapshot = createBrochurePayload(vehicle, events, createdAt, expiresAt)
+
+      await postgresQuery(
+        `
+          INSERT INTO share_brochures (id, profile_id, vehicle_id, created_at, expires_at, payload)
+          VALUES ($1, $2, $3, $4, $5, $6::jsonb)
+        `,
+        [id, profileId, vehicleId, createdAt, expiresAt, JSON.stringify(snapshot)],
+      )
+
+      setJson(response, 200, {
+        id,
+        expiresAt,
+        url: buildPublicShareUrl(request, requestUrl, id),
+      })
+      return
+    }
+
+    const state = await readState()
+    const vehicle = state.vehicles.find((entry) => entry.id === vehicleId && entry.profileId === profileId)
+
+    if (!vehicle) {
+      setJson(response, 404, { message: 'Vehicle not found' })
+      return
+    }
+
+    const activeCount = (state.shareBrochures ?? []).filter(
+      (entry) => entry.profileId === profileId && entry.vehicleId === vehicleId && !isExpired(entry.expiresAt),
+    ).length
+
+    if (activeCount >= MAX_ACTIVE_SHARE_LINKS_PER_VEHICLE) {
+      setJson(response, 429, { message: `Mozesz miec maksymalnie ${MAX_ACTIVE_SHARE_LINKS_PER_VEHICLE} aktywnych linkow dla jednego auta.` })
+      return
+    }
+
+    const vehicleEvents = state.serviceEvents.filter((entry) => entry.profileId === profileId && entry.vehicleId === vehicleId && entry.status === 'completed')
+    const snapshot = createBrochurePayload(vehicle, vehicleEvents, createdAt, expiresAt)
+
+    state.shareBrochures = [
+      ...((state.shareBrochures ?? []).filter((entry) => !isExpired(entry.expiresAt))),
+      {
+        id,
+        profileId,
+        vehicleId,
+        createdAt,
+        expiresAt,
+        payload: snapshot,
+      },
+    ]
+
+    await writeState(state)
+
+    setJson(response, 200, {
+      id,
+      expiresAt,
+      url: buildPublicShareUrl(request, requestUrl, id),
+    })
+    return
+  }
+
+  if (pathname.startsWith('/api/share-brochures/') && method === 'DELETE') {
+    const profileId = getAuthenticatedProfileId(request)
+
+    if (!profileId) {
+      setJson(response, 401, { message: 'Brak aktywnej sesji' })
+      return
+    }
+
+    const brochureId = pathname.slice('/api/share-brochures/'.length).trim()
+
+    if (!brochureId) {
+      setJson(response, 404, { message: 'Share brochure not found' })
+      return
+    }
+
+    if (isPostgresStorage()) {
+      const result = await postgresQuery('DELETE FROM share_brochures WHERE id = $1 AND profile_id = $2 RETURNING id', [brochureId, profileId])
+
+      if (!result.rows[0]) {
+        setJson(response, 404, { message: 'Share brochure not found' })
+        return
+      }
+
+      setJson(response, 200, { ok: true })
+      return
+    }
+
+    const state = await readState()
+    const existing = (state.shareBrochures ?? []).find((entry) => entry.id === brochureId)
+
+    if (!existing || existing.profileId !== profileId) {
+      setJson(response, 404, { message: 'Share brochure not found' })
+      return
+    }
+
+    state.shareBrochures = (state.shareBrochures ?? []).filter((entry) => entry.id !== brochureId)
+    await writeState(state)
+    setJson(response, 200, { ok: true })
     return
   }
 

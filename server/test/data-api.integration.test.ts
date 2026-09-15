@@ -308,4 +308,175 @@ describe('data API integration', () => {
     const listEvents = await apiRequest(`/api/service-events?vehicleId=${vehicle.vehicle.id}`, { cookie })
     expect(listEvents.response.status).toBe(404)
   })
+
+  it('creates 24h public share brochure link for own vehicle', async () => {
+    const stamp = Date.now()
+    const cookie = await registerAndGetCookie(`share_ok_${stamp}`)
+
+    const createVehicle = await apiRequest('/api/vehicles', {
+      method: 'POST',
+      cookie,
+      body: {
+        name: 'Skoda Octavia',
+        make: 'Skoda',
+        model: 'Octavia',
+      },
+    })
+
+    expect(createVehicle.response.status).toBe(200)
+    const vehicle = (await createVehicle.response.json()) as { vehicle: { id: string; name: string } }
+
+    const createEvent = await apiRequest('/api/service-events', {
+      method: 'POST',
+      cookie,
+      body: {
+        vehicleId: vehicle.vehicle.id,
+        status: 'completed',
+        category: 'repair',
+        title: 'Wymiana rozrzadu',
+      },
+    })
+
+    expect(createEvent.response.status).toBe(200)
+
+    const shareResponse = await apiRequest('/api/share-brochures', {
+      method: 'POST',
+      cookie,
+      body: {
+        vehicleId: vehicle.vehicle.id,
+      },
+    })
+
+    expect(shareResponse.response.status).toBe(200)
+    const sharePayload = (await shareResponse.response.json()) as { id: string; expiresAt: string; url: string }
+    expect(sharePayload.id.length).toBeGreaterThanOrEqual(40)
+    expect(sharePayload.url).toContain(`/api/public-share/${sharePayload.id}`)
+    expect(new Date(sharePayload.expiresAt).getTime()).toBeGreaterThan(Date.now())
+
+    const publicResponse = await fetch(sharePayload.url)
+    const html = await publicResponse.text()
+
+    expect(publicResponse.status).toBe(200)
+    expect(publicResponse.headers.get('content-type')).toContain('text/html')
+    expect(html).toContain('Skoda')
+    expect(html).toContain('Wymiana rozrzadu')
+  })
+
+  it('blocks creating share brochure for vehicle from another profile', async () => {
+    const stamp = Date.now()
+    const cookieA = await registerAndGetCookie(`share_block_a_${stamp}`)
+    const cookieB = await registerAndGetCookie(`share_block_b_${stamp}`)
+
+    const createVehicleB = await apiRequest('/api/vehicles', {
+      method: 'POST',
+      cookie: cookieB,
+      body: {
+        name: 'Toyota Corolla',
+        make: 'Toyota',
+        model: 'Corolla',
+      },
+    })
+
+    expect(createVehicleB.response.status).toBe(200)
+    const vehicleB = (await createVehicleB.response.json()) as { vehicle: { id: string } }
+
+    const shareAsA = await apiRequest('/api/share-brochures', {
+      method: 'POST',
+      cookie: cookieA,
+      body: {
+        vehicleId: vehicleB.vehicle.id,
+      },
+    })
+
+    expect(shareAsA.response.status).toBe(404)
+  })
+
+  it('lists active share brochures and allows revoking own link', async () => {
+    const stamp = Date.now()
+    const cookie = await registerAndGetCookie(`share_list_${stamp}`)
+
+    const createVehicle = await apiRequest('/api/vehicles', {
+      method: 'POST',
+      cookie,
+      body: {
+        name: 'Mazda 3',
+        make: 'Mazda',
+        model: '3',
+      },
+    })
+
+    expect(createVehicle.response.status).toBe(200)
+    const vehicle = (await createVehicle.response.json()) as { vehicle: { id: string } }
+
+    const share1 = await apiRequest('/api/share-brochures', {
+      method: 'POST',
+      cookie,
+      body: { vehicleId: vehicle.vehicle.id },
+    })
+    const share2 = await apiRequest('/api/share-brochures', {
+      method: 'POST',
+      cookie,
+      body: { vehicleId: vehicle.vehicle.id },
+    })
+
+    expect(share1.response.status).toBe(200)
+    expect(share2.response.status).toBe(200)
+
+    const first = (await share1.response.json()) as { id: string }
+    const second = (await share2.response.json()) as { id: string }
+
+    const list = await apiRequest(`/api/share-brochures?vehicleId=${vehicle.vehicle.id}`, { cookie })
+    expect(list.response.status).toBe(200)
+    const listPayload = (await list.response.json()) as { brochures: Array<{ id: string; url: string }> }
+    expect(listPayload.brochures.map((entry) => entry.id)).toContain(first.id)
+    expect(listPayload.brochures.map((entry) => entry.id)).toContain(second.id)
+
+    const revoke = await apiRequest(`/api/share-brochures/${first.id}`, {
+      method: 'DELETE',
+      cookie,
+    })
+    expect(revoke.response.status).toBe(200)
+
+    const listAfter = await apiRequest(`/api/share-brochures?vehicleId=${vehicle.vehicle.id}`, { cookie })
+    expect(listAfter.response.status).toBe(200)
+    const listAfterPayload = (await listAfter.response.json()) as { brochures: Array<{ id: string }> }
+    expect(listAfterPayload.brochures.map((entry) => entry.id)).not.toContain(first.id)
+    expect(listAfterPayload.brochures.map((entry) => entry.id)).toContain(second.id)
+  })
+
+  it('enforces max 5 active share brochures per vehicle', async () => {
+    const stamp = Date.now()
+    const cookie = await registerAndGetCookie(`share_limit_${stamp}`)
+
+    const createVehicle = await apiRequest('/api/vehicles', {
+      method: 'POST',
+      cookie,
+      body: {
+        name: 'Kia Ceed',
+        make: 'Kia',
+        model: 'Ceed',
+      },
+    })
+
+    expect(createVehicle.response.status).toBe(200)
+    const vehicle = (await createVehicle.response.json()) as { vehicle: { id: string } }
+
+    for (let i = 0; i < 5; i += 1) {
+      const createShare = await apiRequest('/api/share-brochures', {
+        method: 'POST',
+        cookie,
+        body: { vehicleId: vehicle.vehicle.id },
+      })
+
+      expect(createShare.response.status).toBe(200)
+    }
+
+    const sixthShare = await apiRequest('/api/share-brochures', {
+      method: 'POST',
+      cookie,
+      body: { vehicleId: vehicle.vehicle.id },
+    })
+
+    expect(sixthShare.response.status).toBe(429)
+  })
 })

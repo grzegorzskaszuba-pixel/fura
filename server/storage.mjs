@@ -13,6 +13,7 @@ const emptyState = {
   credentials: [],
   vehicles: [],
   serviceEvents: [],
+  shareBrochures: [],
 }
 
 const storageMode = String(process.env.AUTH_STORAGE ?? '').trim().toLowerCase()
@@ -201,6 +202,7 @@ function normalizeState(candidate) {
     credentials: candidate.credentials,
     vehicles: Array.isArray(candidate.vehicles) ? candidate.vehicles : [],
     serviceEvents: Array.isArray(candidate.serviceEvents) ? candidate.serviceEvents : [],
+    shareBrochures: Array.isArray(candidate.shareBrochures) ? candidate.shareBrochures : [],
   }
 
   return normalized
@@ -328,8 +330,21 @@ async function ensureNormalizedPostgresStorage() {
 
     await pgPool.query('ALTER TABLE service_events ADD COLUMN IF NOT EXISTS workshop_location JSONB')
 
+    await pgPool.query(`
+      CREATE TABLE IF NOT EXISTS share_brochures (
+        id TEXT PRIMARY KEY,
+        profile_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+        vehicle_id UUID NOT NULL REFERENCES vehicles(id) ON DELETE CASCADE,
+        created_at TIMESTAMPTZ NOT NULL,
+        expires_at TIMESTAMPTZ NOT NULL,
+        payload JSONB NOT NULL
+      )
+    `)
+
     await pgPool.query('CREATE INDEX IF NOT EXISTS service_events_profile_updated_idx ON service_events (profile_id, updated_at DESC)')
     await pgPool.query('CREATE INDEX IF NOT EXISTS service_events_vehicle_updated_idx ON service_events (vehicle_id, updated_at DESC)')
+    await pgPool.query('CREATE INDEX IF NOT EXISTS share_brochures_profile_expires_idx ON share_brochures (profile_id, expires_at DESC)')
+    await pgPool.query('CREATE INDEX IF NOT EXISTS share_brochures_expires_idx ON share_brochures (expires_at)')
   })
 
   await withPostgresRetry(async () => {
@@ -453,6 +468,24 @@ async function ensureNormalizedPostgresStorage() {
             event.recurrenceMileageInterval ?? null,
             event.createdAt,
             event.updatedAt,
+          ],
+        )
+      }
+
+      for (const brochure of legacyState.shareBrochures ?? []) {
+        await client.query(
+          `
+            INSERT INTO share_brochures (id, profile_id, vehicle_id, created_at, expires_at, payload)
+            VALUES ($1, $2, $3, $4, $5, $6::jsonb)
+            ON CONFLICT (id) DO NOTHING
+          `,
+          [
+            brochure.id,
+            brochure.profileId,
+            brochure.vehicleId,
+            brochure.createdAt,
+            brochure.expiresAt,
+            JSON.stringify(brochure.payload ?? {}),
           ],
         )
       }
