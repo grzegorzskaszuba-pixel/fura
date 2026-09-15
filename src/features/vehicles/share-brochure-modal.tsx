@@ -105,7 +105,6 @@ export function ShareBrochureModal({
       open={open}
       onOpenChange={onOpenChange}
       title="Podziel się dokumentacją"
-      description={`Publiczny podgląd dla: ${vehicleName}`}
     >
       <div className="space-y-4 pb-2">
         <p className="text-sm text-zinc-600">
