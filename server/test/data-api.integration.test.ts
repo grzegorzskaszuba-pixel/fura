@@ -309,6 +309,57 @@ describe('data API integration', () => {
     expect(listEvents.response.status).toBe(404)
   })
 
+  it('does not include attachment previews in vehicle history responses', async () => {
+    const stamp = Date.now()
+    const cookie = await registerAndGetCookie(`history_attachments_${stamp}`)
+
+    const createVehicle = await apiRequest('/api/vehicles', {
+      method: 'POST',
+      cookie,
+      body: {
+        name: 'Volvo V60',
+        make: 'Volvo',
+        model: 'V60',
+      },
+    })
+
+    expect(createVehicle.response.status).toBe(200)
+    const vehicle = (await createVehicle.response.json()) as { vehicle: { id: string } }
+    const previewUrl = `data:image/jpeg;base64,${'a'.repeat(2_000_000)}`
+
+    const createEvent = await apiRequest('/api/service-events', {
+      method: 'POST',
+      cookie,
+      body: {
+        vehicleId: vehicle.vehicle.id,
+        status: 'completed',
+        category: 'repair',
+        title: 'Wymiana tarcz',
+        attachments: [{ id: 'attachment-1', name: 'tarcze.jpg', mimeType: 'image/jpeg', previewUrl }],
+      },
+    })
+
+    expect(createEvent.response.status).toBe(200)
+    const createdEvent = (await createEvent.response.json()) as { event: { id: string } }
+
+    const listEvents = await apiRequest(`/api/service-events?vehicleId=${vehicle.vehicle.id}`, { cookie })
+    const payload = (await listEvents.response.json()) as {
+      events: Array<{ attachmentCount?: number; attachmentNames?: string[]; attachments?: unknown[] }>
+    }
+
+    expect(listEvents.response.status).toBe(200)
+    expect(payload.events).toHaveLength(1)
+    expect(payload.events[0]?.attachmentCount).toBe(1)
+    expect(payload.events[0]?.attachmentNames).toEqual(['tarcze.jpg'])
+    expect(payload.events[0]?.attachments).toBeUndefined()
+
+    const detailResponse = await apiRequest(`/api/service-events/${createdEvent.event.id}`, { cookie })
+    const detailPayload = (await detailResponse.response.json()) as { event: { attachments?: Array<{ previewUrl?: string }> } }
+
+    expect(detailResponse.response.status).toBe(200)
+    expect(detailPayload.event.attachments?.[0]?.previewUrl).toBe(previewUrl)
+  })
+
   it('creates 6h public share brochure link for own vehicle', async () => {
     const stamp = Date.now()
     const cookie = await registerAndGetCookie(`share_ok_${stamp}`)

@@ -60,5 +60,9 @@ export async function httpRequest<TResponse>(url: string, init?: HttpRequestInit
     throw new HttpError(message, response.status)
   }
 
+  if (!isJson || payload === null || typeof payload !== 'object') {
+    throw new Error('API zwróciło nieprawidłową odpowiedź. Spróbuj ponownie za chwilę.')
+  }
+
   return payload as TResponse
 }

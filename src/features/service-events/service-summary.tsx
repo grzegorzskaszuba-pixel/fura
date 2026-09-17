@@ -11,7 +11,7 @@ interface ServiceSummaryProps {
   vehicle: Vehicle
   completedEvents: ServiceEvent[]
   plannedEvents: ServiceEvent[]
-  onNextServiceClick?: () => void
+  onNextServiceClick?: (event: ServiceEvent) => void
 }
 
 interface SummaryItem {
@@ -218,7 +218,7 @@ export function ServiceSummary({ vehicle, completedEvents, plannedEvents, onNext
                   disabled={!isClickable}
                   onClick={() => {
                     if (isNextServiceClickable) {
-                      onNextServiceClick?.()
+                      onNextServiceClick?.(nextPlannedService)
                       return
                     }
 

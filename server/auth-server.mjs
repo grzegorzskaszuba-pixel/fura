@@ -28,6 +28,9 @@ const startedAt = new Date().toISOString()
 let cachedLegacyState = null
 const SHARE_BROCHURE_TTL_MS = 6 * 60 * 60 * 1000
 const MAX_SHARED_HISTORY_ITEMS = 30
+const MAX_SERVICE_ATTACHMENTS = 10
+const MAX_SERVICE_ATTACHMENT_PREVIEW_LENGTH = 8 * 1024 * 1024
+const MAX_SERVICE_ATTACHMENT_PREVIEWS_LENGTH = 20 * 1024 * 1024
 
 function isInputError(error) {
   if (!(error instanceof Error)) {
@@ -47,6 +50,7 @@ function isInputError(error) {
     normalized.includes('profil nie istnieje') ||
     normalized.includes('brak ') ||
     normalized.includes('musi miec co najmniej') ||
+    normalized.includes('zalacznik') ||
     normalized.includes('nie istnieje')
   )
 }
@@ -720,7 +724,7 @@ function mapVehicleRow(row) {
   }
 }
 
-function mapServiceEventRow(row) {
+function mapServiceEventRow(row, includeAttachments = true) {
   return {
     id: row.id,
     profileId: row.profile_id,
@@ -739,7 +743,7 @@ function mapServiceEventRow(row) {
     currency: row.currency,
     attachmentCount: normalizeNumber(row.attachment_count),
     attachmentNames: Array.isArray(row.attachment_names) ? row.attachment_names : undefined,
-    attachments: Array.isArray(row.attachments) ? row.attachments : undefined,
+    attachments: includeAttachments && Array.isArray(row.attachments) ? row.attachments : undefined,
     isRecurring: typeof row.is_recurring === 'boolean' ? row.is_recurring : undefined,
     recurrenceType: row.recurrence_type ?? undefined,
     recurrenceIntervalValue: normalizeNumber(row.recurrence_interval_value),
@@ -748,6 +752,58 @@ function mapServiceEventRow(row) {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }
+}
+
+function mapServiceEventListItem(event) {
+  const listItem = { ...event }
+  delete listItem.attachments
+  return listItem
+}
+
+function normalizeServiceAttachments(value) {
+  if (!Array.isArray(value)) {
+    return undefined
+  }
+
+  if (value.length > MAX_SERVICE_ATTACHMENTS) {
+    throw new Error(`Maksymalnie ${MAX_SERVICE_ATTACHMENTS} zalacznikow`)
+  }
+
+  let previewLength = 0
+  const attachments = value.map((attachment) => {
+    if (!attachment || typeof attachment !== 'object') {
+      throw new Error('Nieprawidlowy zalacznik')
+    }
+
+    const name = normalizeOptionalString(attachment.name)
+
+    if (!name) {
+      throw new Error('Zalacznik musi miec nazwe')
+    }
+
+    const previewUrl = normalizeOptionalString(attachment.previewUrl)
+
+    if (previewUrl) {
+      if (previewUrl.length > MAX_SERVICE_ATTACHMENT_PREVIEW_LENGTH) {
+        throw new Error('Zalacznik jest za duzy')
+      }
+
+      previewLength += previewUrl.length
+
+      if (previewLength > MAX_SERVICE_ATTACHMENT_PREVIEWS_LENGTH) {
+        throw new Error('Laczny rozmiar zalacznikow jest za duzy')
+      }
+    }
+
+    return {
+      id: normalizeOptionalString(attachment.id) ?? crypto.randomUUID(),
+      name,
+      mimeType: normalizeOptionalString(attachment.mimeType),
+      previewUrl,
+    }
+  })
+
+  return attachments.length > 0 ? attachments : undefined
 }
 
 function sanitizeVehiclePayload(payload) {
@@ -793,6 +849,10 @@ function sanitizeServiceEventPayload(payload) {
   const title = String(payload.title ?? '').trim()
   const category = String(payload.category ?? '').trim()
   const vehicleId = String(payload.vehicleId ?? '').trim()
+  const attachments = normalizeServiceAttachments(payload.attachments)
+  const attachmentNames = Array.isArray(payload.attachmentNames)
+    ? payload.attachmentNames.filter((name) => typeof name === 'string').slice(0, MAX_SERVICE_ATTACHMENTS)
+    : attachments?.map((attachment) => attachment.name)
 
   if (!validStatuses.has(validStatus)) {
     throw new Error('Nieprawidlowy status wpisu')
@@ -819,9 +879,9 @@ function sanitizeServiceEventPayload(payload) {
     partsCost: normalizeOptionalNumber(payload.partsCost),
     laborCost: normalizeOptionalNumber(payload.laborCost),
     otherCost: normalizeOptionalNumber(payload.otherCost),
-    attachmentCount: normalizeOptionalNumber(payload.attachmentCount),
-    attachmentNames: Array.isArray(payload.attachmentNames) ? payload.attachmentNames.filter((name) => typeof name === 'string') : undefined,
-    attachments: Array.isArray(payload.attachments) ? payload.attachments : undefined,
+    attachmentCount: attachments?.length ?? normalizeOptionalNumber(payload.attachmentCount),
+    attachmentNames,
+    attachments,
     isRecurring: typeof payload.isRecurring === 'boolean' ? payload.isRecurring : undefined,
     recurrenceType: payload.recurrenceType === 'time' || payload.recurrenceType === 'mileage' ? payload.recurrenceType : undefined,
     recurrenceIntervalValue: normalizeOptionalNumber(payload.recurrenceIntervalValue),
@@ -1323,11 +1383,19 @@ async function handleAuthRequest(request, response) {
       }
 
       const eventsResult = await postgresQuery(
-        'SELECT * FROM service_events WHERE profile_id = $1 AND vehicle_id = $2 ORDER BY updated_at DESC',
+        `
+          SELECT id, profile_id, vehicle_id, status, category, title, event_date, mileage, description,
+            workshop_name, workshop_location, parts_cost, labor_cost, other_cost, currency, attachment_count,
+            attachment_names, is_recurring, recurrence_type, recurrence_interval_value,
+            recurrence_interval_unit, recurrence_mileage_interval, created_at, updated_at
+          FROM service_events
+          WHERE profile_id = $1 AND vehicle_id = $2
+          ORDER BY updated_at DESC
+        `,
         [profileId, vehicleId],
       )
 
-      setJson(response, 200, { events: eventsResult.rows.map(mapServiceEventRow) })
+      setJson(response, 200, { events: eventsResult.rows.map((row) => mapServiceEventRow(row, false)) })
       return
     }
 
@@ -1343,7 +1411,7 @@ async function handleAuthRequest(request, response) {
       .filter((event) => event.profileId === profileId && event.vehicleId === vehicleId)
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
 
-    setJson(response, 200, { events })
+    setJson(response, 200, { events: events.map(mapServiceEventListItem) })
     return
   }
 

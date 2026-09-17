@@ -215,6 +215,28 @@ export default function App() {
     await appStateRepository.setCurrentVehicleId(currentProfileId, vehicleId)
   }
 
+  async function handleServiceEventOpen(event: ServiceEvent) {
+    setDetailEventId(event.id)
+
+    const attachmentCount = event.attachmentCount ?? event.attachmentNames?.length ?? 0
+
+    if (event.attachments || attachmentCount === 0) {
+      return
+    }
+
+    try {
+      const fullEvent = await serviceEventRepository.getById(event.id)
+
+      if (!fullEvent) {
+        return
+      }
+
+      setServiceEvents((previousEvents) => previousEvents.map((entry) => (entry.id === fullEvent.id ? fullEvent : entry)))
+    } catch (error) {
+      setAppError(error instanceof Error ? error.message : 'Nie udało się pobrać załączników wpisu')
+    }
+  }
+
   useEffect(() => {
     if (detailEvent && detailEvent.status === 'planned') {
       setServiceTab('plan')
@@ -626,15 +648,7 @@ export default function App() {
               vehicle={activeVehicle}
               completedEvents={completedEvents}
               plannedEvents={plannedEvents}
-              onNextServiceClick={() => {
-                const nextPlannedService = plannedEvents[0]
-
-                if (!nextPlannedService) {
-                  return
-                }
-
-                setDetailEventId(nextPlannedService.id)
-              }}
+              onNextServiceClick={(event) => void handleServiceEventOpen(event)}
             />
 
             <ServiceEventList
@@ -643,7 +657,7 @@ export default function App() {
               events={visibleEvents}
               isLoading={isServiceEventsLoading}
               onTabChange={setServiceTab}
-              onEventClick={(event) => setDetailEventId(event.id)}
+              onEventClick={(event) => void handleServiceEventOpen(event)}
             />
           </>
         ) : null}

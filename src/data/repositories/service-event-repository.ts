@@ -43,8 +43,13 @@ export const serviceEventRepository = {
         .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))
     }
 
-    const response = await httpRequest<{ events: ServiceEvent[] }>(`${serviceEventsBaseUrl}?vehicleId=${encodeURIComponent(vehicleId)}`)
+    const response = await httpRequest<{ events?: ServiceEvent[] }>(`${serviceEventsBaseUrl}?vehicleId=${encodeURIComponent(vehicleId)}`)
     void profileId
+
+    if (!Array.isArray(response.events)) {
+      throw new Error('API zwróciło nieprawidłową historię serwisową')
+    }
+
     return response.events
   },
 
