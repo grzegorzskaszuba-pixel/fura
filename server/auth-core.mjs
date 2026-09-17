@@ -12,6 +12,36 @@ function normalizeUsername(username) {
   return String(username).trim().toLowerCase()
 }
 
+function isEmail(value) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
+}
+
+export function normalizeEmail(email) {
+  const normalizedEmail = normalizeUsername(email)
+
+  if (!isEmail(normalizedEmail)) {
+    throw new Error('Podaj prawidłowy adres e-mail')
+  }
+
+  return normalizedEmail
+}
+
+function createLegacyEmail(username, usedEmails) {
+  const localPart = normalizeUsername(username)
+    .replace(/[^a-z0-9._-]+/g, '-')
+    .replace(/^[.-]+|[.-]+$/g, '') || 'user'
+  const baseEmail = `${localPart}@fura.info`
+  let email = baseEmail
+  let suffix = 2
+
+  while (usedEmails.has(email)) {
+    email = `${localPart}${suffix}@fura.info`
+    suffix += 1
+  }
+
+  return email
+}
+
 function hashPassword(password, salt) {
   return crypto.scryptSync(password, salt, 64).toString('hex')
 }
@@ -59,11 +89,11 @@ export function getSessionProfileId(sessions, sessionId) {
 }
 
 export function registerProfile(state, input) {
-  const username = normalizeUsername(input.username)
+  const username = normalizeEmail(input.username)
   const password = String(input.password ?? '')
   const displayName = String(input.displayName ?? '').trim()
 
-  if (username.length < 2) {
+  if (displayName.length < 2) {
     throw new Error('Podaj nazwę użytkownika')
   }
 
@@ -77,7 +107,7 @@ export function registerProfile(state, input) {
   const profile = {
     id: createId(),
     username,
-    displayName: displayName || username,
+    displayName,
     createdAt: timestamp,
     updatedAt: timestamp,
   }
@@ -99,7 +129,7 @@ export function registerProfile(state, input) {
 }
 
 export function loginProfile(state, input) {
-  const username = normalizeUsername(input.username)
+  const username = normalizeEmail(input.username)
   const password = String(input.password ?? '')
 
   const credentials = state.credentials.find((entry) => entry.username === username)
@@ -126,7 +156,7 @@ export function loginProfile(state, input) {
 }
 
 export function resetPassword(state, input) {
-  const username = normalizeUsername(input.username)
+  const username = normalizeEmail(input.username)
   const password = String(input.password ?? '')
   validatePassword(password)
 
@@ -165,5 +195,46 @@ export function changePassword(state, input) {
   credentials.passwordHash = passwordData.hash
   credentials.passwordSalt = passwordData.salt
   credentials.updatedAt = now()
+}
+
+export function migrateAuthState(state) {
+  const usedEmails = new Set()
+  let changed = false
+
+  for (const profile of state.profiles) {
+    const credential = state.credentials.find((entry) => entry.profileId === profile.id)
+    const currentUsername = normalizeUsername(profile.username || credential?.username || '')
+    const email = isEmail(currentUsername) && !usedEmails.has(currentUsername) ? currentUsername : createLegacyEmail(currentUsername, usedEmails)
+
+    usedEmails.add(email)
+
+    if (profile.username !== email) {
+      profile.username = email
+      changed = true
+    }
+
+    if (credential && credential.username !== email) {
+      credential.username = email
+      changed = true
+    }
+  }
+
+  for (const credential of state.credentials) {
+    if (usedEmails.has(credential.username)) {
+      continue
+    }
+
+    const currentUsername = normalizeUsername(credential.username)
+    const email = isEmail(currentUsername) ? currentUsername : createLegacyEmail(currentUsername, usedEmails)
+
+    if (credential.username !== email) {
+      credential.username = email
+      changed = true
+    }
+
+    usedEmails.add(email)
+  }
+
+  return changed
 }
 

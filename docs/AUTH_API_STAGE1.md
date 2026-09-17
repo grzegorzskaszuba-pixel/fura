@@ -22,9 +22,9 @@ Domyślnie: `local`.
 Bazowy prefiks: `${VITE_API_BASE_URL}/auth`
 
 - `GET /session` -> `{ profileId: string | null }`
-- `POST /login` body: `{ username, password }` -> `{ profile }`
-- `POST /register` body: `{ username, password, displayName? }` -> `{ profile }`
-- `POST /reset-password` body: `{ username, password }` -> `204/200`
+- `POST /login` body: `{ username: email, password }` -> `{ profile }`
+- `POST /register` body: `{ username: email, password, displayName }` -> `{ profile }`
+- `POST /reset-password` body: `{ username: email, password }` -> `204/200`
 - `POST /change-password` body: `{ profileId, currentPassword, newPassword }` -> `204/200`
 - `POST /switch-profile` body: `{ profileId }` -> `{ profile }`
 - `POST /logout` -> `204/200`
@@ -35,6 +35,8 @@ Bazowy prefiks: `${VITE_API_BASE_URL}/auth`
 - małe moduły z jedną odpowiedzialnością
 - adapter auth podmienialny bez zmian w ekranach biznesowych
 - brak zmian w repozytoriach pojazdów i serwisu na etapie 1
+
+Pole `username` zachowuje nazwe dla kompatybilnosci ze storage, ale przechowuje znormalizowany adres e-mail uzywany do logowania. Pole `displayName` jest nazwa uzytkownika widoczna w profilu.
 
 ## Następny krok (etap 2)
 

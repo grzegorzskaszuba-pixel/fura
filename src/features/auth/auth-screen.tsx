@@ -11,7 +11,7 @@ import { Label } from '@/shared/components/ui/label'
 import type { LoginCredentials, RegisterCredentials } from '@/shared/types/domain'
 
 const authSchema = z.object({
-  username: z.string().trim().min(2, 'Podaj nazwę użytkownika'),
+  username: z.string().trim().email('Podaj prawidłowy adres e-mail'),
   password: z.string().min(6, 'Hasło musi mieć co najmniej 6 znaków'),
   displayName: z.string().trim().optional(),
 })
@@ -54,6 +54,11 @@ export function AuthScreen({ onLogin, onRegister, onResetPassword, allowResetPas
 
         await onResetPassword({ username: values.username, password: values.password })
       } else {
+        if (!values.displayName?.trim() || values.displayName.trim().length < 2) {
+          form.setError('displayName', { type: 'manual', message: 'Podaj nazwę użytkownika' })
+          return
+        }
+
         await onRegister({ username: values.username, password: values.password, displayName: values.displayName })
       }
     } catch (submitError) {
@@ -107,8 +112,8 @@ export function AuthScreen({ onLogin, onRegister, onResetPassword, allowResetPas
 
               <form className="space-y-4" onSubmit={form.handleSubmit(handleSubmit)}>
                 <div className="space-y-2">
-                  <Label htmlFor="username">Nazwa użytkownika</Label>
-                  <Input id="username" placeholder="np. kierowca01" disabled={isSubmitting} {...form.register('username')} />
+                  <Label htmlFor="username">E-mail użytkownika</Label>
+                  <Input id="username" type="email" autoComplete="username" placeholder="np. kierowca@example.com" disabled={isSubmitting} {...form.register('username')} />
                   {form.formState.errors.username ? (
                     <p className="text-sm text-red-600">{form.formState.errors.username.message}</p>
                   ) : null}
@@ -124,8 +129,11 @@ export function AuthScreen({ onLogin, onRegister, onResetPassword, allowResetPas
 
                 {mode === 'register' ? (
                   <div className="space-y-2">
-                    <Label htmlFor="displayName">Nazwa wyświetlana</Label>
-                    <Input id="displayName" placeholder="np. Mój profil" disabled={isSubmitting} {...form.register('displayName')} />
+                    <Label htmlFor="displayName">Nazwa użytkownika</Label>
+                    <Input id="displayName" autoComplete="name" placeholder="np. Jan Kowalski" disabled={isSubmitting} {...form.register('displayName')} />
+                    {form.formState.errors.displayName ? (
+                      <p className="text-sm text-red-600">{form.formState.errors.displayName.message}</p>
+                    ) : null}
                   </div>
                 ) : null}
 

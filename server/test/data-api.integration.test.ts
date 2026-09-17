@@ -87,10 +87,11 @@ describe('data API integration', () => {
   }
 
   async function registerAndGetCookie(username: string) {
+    const email = username.includes('@') ? username : `${username}@example.com`
     const { response, nextCookie } = await apiRequest('/api/auth/register', {
       method: 'POST',
       body: {
-        username,
+        username: email,
         displayName: username,
         password: 'secret123',
       },

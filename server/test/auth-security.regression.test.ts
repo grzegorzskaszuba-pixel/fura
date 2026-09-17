@@ -117,8 +117,8 @@ describe('Auth security regression', () => {
 
   it('rejects password reset when username does not belong to active session profile', async () => {
     const stamp = Date.now()
-    const userA = `secure_a_${stamp}`
-    const userB = `secure_b_${stamp}`
+    const userA = `secure_a_${stamp}@example.com`
+    const userB = `secure_b_${stamp}@example.com`
 
     const registerA = await apiRequest('/api/auth/register', {
       method: 'POST',
@@ -186,7 +186,7 @@ describe('Auth security regression', () => {
 
   it('logs out profile from all active sessions', async () => {
     const stamp = Date.now()
-    const username = `logout_all_${stamp}`
+    const username = `logout_all_${stamp}@example.com`
 
     const register = await apiRequest('/api/auth/register', {
       method: 'POST',
@@ -246,8 +246,8 @@ describe('Auth security regression', () => {
 
   it('rejects updating vehicle from another profile session', async () => {
     const stamp = Date.now()
-    const userA = `vehicle_owner_${stamp}`
-    const userB = `vehicle_intruder_${stamp}`
+    const userA = `vehicle_owner_${stamp}@example.com`
+    const userB = `vehicle_intruder_${stamp}@example.com`
 
     const registerA = await apiRequest('/api/auth/register', {
       method: 'POST',
@@ -311,8 +311,8 @@ describe('Auth security regression', () => {
 
   it('rejects updating service event from another profile session', async () => {
     const stamp = Date.now()
-    const userA = `event_owner_${stamp}`
-    const userB = `event_intruder_${stamp}`
+    const userA = `event_owner_${stamp}@example.com`
+    const userB = `event_intruder_${stamp}@example.com`
 
     const registerA = await apiRequest('/api/auth/register', {
       method: 'POST',
@@ -390,7 +390,7 @@ describe('Auth security regression', () => {
 
   it('does not allow moving event to another vehicle by payload tampering', async () => {
     const stamp = Date.now()
-    const user = `event_tamper_${stamp}`
+    const user = `event_tamper_${stamp}@example.com`
 
     const register = await apiRequest('/api/auth/register', {
       method: 'POST',
@@ -472,7 +472,7 @@ describe('Auth security regression', () => {
 
   it('rejects service event update with invalid status', async () => {
     const stamp = Date.now()
-    const user = `event_status_${stamp}`
+    const user = `event_status_${stamp}@example.com`
 
     const register = await apiRequest('/api/auth/register', {
       method: 'POST',

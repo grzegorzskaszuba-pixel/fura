@@ -2,6 +2,8 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { Pool } from 'pg'
 
+import { migrateAuthState } from './auth-core.mjs'
+
 const resolvedDbPath = process.env.AUTH_DB_FILE
   ? path.resolve(process.env.AUTH_DB_FILE)
   : path.resolve('server/data/auth-db.json')
@@ -351,6 +353,85 @@ async function ensureNormalizedPostgresStorage() {
     await ensurePostgresStorage()
     const legacyResult = await pgPool.query('SELECT state FROM app_state WHERE id = 1 LIMIT 1')
     const legacyState = normalizeState(legacyResult.rows[0]?.state ?? emptyState)
+    const legacyStateChanged = migrateAuthState(legacyState)
+
+    if (legacyStateChanged) {
+      await pgPool.query('UPDATE app_state SET state = $1::jsonb, updated_at = NOW() WHERE id = 1', [JSON.stringify(legacyState)])
+    }
+
+    const normalizedAuthResult = await pgPool.query(`
+      SELECT
+        p.id,
+        p.username,
+        c.username AS credential_username,
+        c.password_hash,
+        c.password_salt,
+        c.created_at,
+        c.updated_at
+      FROM profiles p
+      LEFT JOIN credentials c ON c.profile_id = p.id
+    `)
+    const normalizedAuthState = {
+      profiles: normalizedAuthResult.rows.map((row) => ({
+        id: row.id,
+        username: row.username,
+        displayName: '',
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+      })),
+      credentials: normalizedAuthResult.rows
+        .filter((row) => row.credential_username)
+        .map((row) => ({
+          profileId: row.id,
+          username: row.credential_username,
+          passwordHash: row.password_hash,
+          passwordSalt: row.password_salt,
+          createdAt: row.created_at,
+          updatedAt: row.updated_at,
+        })),
+    }
+    const previousProfileUsernames = new Map(normalizedAuthState.profiles.map((profile) => [profile.id, profile.username]))
+    const previousCredentialUsernames = new Map(normalizedAuthState.credentials.map((credential) => [credential.profileId, credential.username]))
+    const normalizedAuthChanged = migrateAuthState(normalizedAuthState)
+
+    if (normalizedAuthChanged) {
+      const client = await pgPool.connect()
+
+      try {
+        await client.query('BEGIN')
+
+        for (const profile of normalizedAuthState.profiles) {
+          if (previousProfileUsernames.get(profile.id) !== profile.username) {
+            await client.query('UPDATE profiles SET username = $1 WHERE id = $2', [`migration-${profile.id}@fura.info`, profile.id])
+          }
+        }
+
+        for (const credential of normalizedAuthState.credentials) {
+          if (previousCredentialUsernames.get(credential.profileId) !== credential.username) {
+            await client.query('UPDATE credentials SET username = $1 WHERE profile_id = $2', [`migration-${credential.profileId}@fura.info`, credential.profileId])
+          }
+        }
+
+        for (const profile of normalizedAuthState.profiles) {
+          if (previousProfileUsernames.get(profile.id) !== profile.username) {
+            await client.query('UPDATE profiles SET username = $1 WHERE id = $2', [profile.username, profile.id])
+          }
+        }
+
+        for (const credential of normalizedAuthState.credentials) {
+          if (previousCredentialUsernames.get(credential.profileId) !== credential.username) {
+            await client.query('UPDATE credentials SET username = $1 WHERE profile_id = $2', [credential.username, credential.profileId])
+          }
+        }
+
+        await client.query('COMMIT')
+      } catch (error) {
+        await client.query('ROLLBACK')
+        throw error
+      } finally {
+        client.release()
+      }
+    }
 
     if (legacyState.profiles.length === 0 && legacyState.credentials.length === 0 && legacyState.vehicles.length === 0 && legacyState.serviceEvents.length === 0) {
       return
@@ -569,14 +650,26 @@ async function writeStatePostgres(nextState) {
 
 export async function readState() {
   if (usePostgres) {
-    return readStatePostgres()
+    const state = await readStatePostgres()
+
+    if (migrateAuthState(state)) {
+      await writeStatePostgres(state)
+    }
+
+    return state
   }
 
   await ensureStorageFile()
   const content = await readFile(dbPath, 'utf8')
 
   try {
-    return normalizeState(JSON.parse(content))
+    const state = normalizeState(JSON.parse(content))
+
+    if (migrateAuthState(state)) {
+      await writeFile(dbPath, JSON.stringify(state, null, 2), 'utf8')
+    }
+
+    return state
   } catch {
     return structuredClone(emptyState)
   }

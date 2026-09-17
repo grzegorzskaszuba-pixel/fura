@@ -10,7 +10,7 @@ import { Label } from '@/shared/components/ui/label'
 import type { UserProfile } from '@/shared/types/domain'
 
 const profileSchema = z.object({
-  displayName: z.string().trim().min(2, 'Nazwa wyświetlana musi mieć co najmniej 2 znaki'),
+  displayName: z.string().trim().min(2, 'Nazwa użytkownika musi mieć co najmniej 2 znaki'),
 })
 
 const passwordSchema = z
@@ -113,17 +113,17 @@ export function ProfileSettingsModal({
         onOpenChange(nextOpen)
       }}
       title="Mój profil"
-      description="Edytuj nazwę wyświetlaną i zarządzaj hasłem."
+      description="Edytuj nazwę użytkownika i zarządzaj hasłem."
     >
       <div className="space-y-6">
         <form className="space-y-4" onSubmit={profileForm.handleSubmit(handleProfileSubmit)}>
           <div className="space-y-2">
-            <Label htmlFor="username">Login</Label>
+            <Label htmlFor="username">E-mail użytkownika</Label>
             <Input id="username" value={currentProfile.username} disabled />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="display-name">Nazwa wyświetlana</Label>
+            <Label htmlFor="display-name">Nazwa użytkownika</Label>
             <Input id="display-name" {...profileForm.register('displayName')} />
             {profileForm.formState.errors.displayName ? (
               <p className="text-sm text-red-600">{profileForm.formState.errors.displayName.message}</p>

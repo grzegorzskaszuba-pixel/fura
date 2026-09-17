@@ -39,7 +39,7 @@ beforeEach(async () => {
   await initializeDatabase()
 
   const profile = await appAuthService.register({
-    username: 'tester',
+    username: 'tester@example.com',
     displayName: 'Tester',
     password: 'haslo123',
   })

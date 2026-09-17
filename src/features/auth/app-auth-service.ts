@@ -1,5 +1,6 @@
 import { appStateRepository } from '@/data/repositories/app-state-repository'
 import { authCredentialRepository } from '@/data/repositories/auth-credential-repository'
+import { initializeDatabase } from '@/data/database/db'
 import { profileRepository } from '@/data/repositories/profile-repository'
 import type { AuthService } from '@/features/auth/auth-service'
 import { createPasswordHash, verifyPassword } from '@/shared/lib/password'
@@ -22,11 +23,18 @@ async function setAndReturnProfile(profileId: string) {
 
 export class AppAuthService implements AuthService {
   async getCurrentProfileId() {
+    await initializeDatabase()
     return appStateRepository.getCurrentProfileId()
   }
 
   async login(input: LoginCredentials) {
+    await initializeDatabase()
     const normalizedUsername = input.username.trim().toLowerCase()
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedUsername)) {
+      throw new Error('Podaj prawidłowy adres e-mail')
+    }
+
     const credentials = await authCredentialRepository.getByUsername(normalizedUsername)
 
     if (!credentials) {
@@ -43,7 +51,18 @@ export class AppAuthService implements AuthService {
   }
 
   async register(input: RegisterCredentials) {
+    await initializeDatabase()
     const normalizedUsername = input.username.trim().toLowerCase()
+    const displayName = input.displayName?.trim() ?? ''
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedUsername)) {
+      throw new Error('Podaj prawidłowy adres e-mail')
+    }
+
+    if (displayName.length < 2) {
+      throw new Error('Podaj nazwę użytkownika')
+    }
+
     const existingProfile = await profileRepository.getByUsername(normalizedUsername)
 
     if (existingProfile) {
@@ -52,7 +71,7 @@ export class AppAuthService implements AuthService {
 
     const profile = await profileRepository.create({
       username: normalizedUsername,
-      displayName: input.displayName,
+      displayName,
     })
     const passwordData = await createPasswordHash(input.password)
     const now = new Date().toISOString()

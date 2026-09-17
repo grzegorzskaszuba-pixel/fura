@@ -7,7 +7,7 @@ import { appAuthService } from '@/features/auth/app-auth-service'
 
 describe('Profile isolation regression', () => {
   it('does not display other local profiles in profile menu', async () => {
-    const secondaryUsername = `other-${Date.now()}`
+    const secondaryUsername = `other-${Date.now()}@example.com`
 
     await appAuthService.register({
       username: secondaryUsername,
@@ -16,7 +16,7 @@ describe('Profile isolation regression', () => {
     })
 
     await appAuthService.login({
-      username: 'tester',
+      username: 'tester@example.com',
       password: 'haslo123',
     })
 

@@ -47,6 +47,9 @@ Przeplyw:
 3. Backend tworzy `sessionId`, ustawia cookie sesyjne i zwraca dane profilu.
 4. Frontend kontynuuje prace w kontekcie sesji.
 
+Identyfikatorem logowania jest adres e-mail oraz haslo. Istniejace identyfikatory, ktore nie byly adresami e-mail, sa jednorazowo rozszerzane o domene `@fura.info`; hasla i ich hashe nie sa zmieniane. Nazwa uzytkownika jest przechowywana jako `displayName` i zwracana w profilu.
+
+
 ### 3.2 Hasla i weryfikacja
 
 Aktualna implementacja:

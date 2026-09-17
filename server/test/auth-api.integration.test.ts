@@ -1,7 +1,8 @@
 // @vitest-environment node
 
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import crypto from 'node:crypto'
 import net from 'node:net'
 import os from 'node:os'
 import path from 'node:path'
@@ -87,6 +88,37 @@ describe('auth API integration', () => {
   beforeAll(async () => {
     tempDir = await mkdtemp(path.join(os.tmpdir(), 'carlog-auth-api-'))
     const dbFile = path.join(tempDir, 'auth-db.json')
+    const legacySalt = 'legacy-salt-for-api-test'
+    const legacyPasswordHash = crypto.scryptSync('legacy-pass-1', legacySalt, 64).toString('hex')
+
+    await writeFile(
+      dbFile,
+      JSON.stringify({
+        profiles: [
+          {
+            id: 'legacy-profile-api-test',
+            username: 'legacy_api_user',
+            displayName: 'Legacy API User',
+            createdAt: '2026-01-01T00:00:00.000Z',
+            updatedAt: '2026-01-01T00:00:00.000Z',
+          },
+        ],
+        credentials: [
+          {
+            profileId: 'legacy-profile-api-test',
+            username: 'legacy_api_user',
+            passwordHash: legacyPasswordHash,
+            passwordSalt: legacySalt,
+            createdAt: '2026-01-01T00:00:00.000Z',
+            updatedAt: '2026-01-01T00:00:00.000Z',
+          },
+        ],
+        vehicles: [],
+        serviceEvents: [],
+      }),
+      'utf8',
+    )
+
     const port = await findFreePort()
     baseUrl = `http://127.0.0.1:${port}`
 
@@ -119,7 +151,7 @@ describe('auth API integration', () => {
     await apiRequest('/api/auth/register', {
       method: 'POST',
       body: {
-        username: `user_${stamp}_a`,
+        username: `user_${stamp}_a@example.com`,
         displayName: 'User A',
         password: 'secret123',
       },
@@ -128,7 +160,7 @@ describe('auth API integration', () => {
     const registerB = await apiRequest('/api/auth/register', {
       method: 'POST',
       body: {
-        username: `user_${stamp}_b`,
+        username: `user_${stamp}_b@example.com`,
         displayName: 'User B',
         password: 'secret123',
       },
@@ -141,7 +173,39 @@ describe('auth API integration', () => {
 
     expect(profilesResponse.status).toBe(200)
     expect(payload.profiles).toHaveLength(1)
-    expect(payload.profiles[0]?.username).toBe(`user_${stamp}_b`)
+    expect(payload.profiles[0]?.username).toBe(`user_${stamp}_b@example.com`)
+  })
+
+  it('migrates legacy usernames and keeps their password valid', async () => {
+    sessionCookie = ''
+
+    const response = await apiRequest('/api/auth/login', {
+      method: 'POST',
+      body: {
+        username: 'legacy_api_user@fura.info',
+        password: 'legacy-pass-1',
+      },
+    })
+    const payload = (await response.json()) as { profile: { username: string; displayName: string } }
+
+    expect(response.status).toBe(200)
+    expect(payload.profile.username).toBe('legacy_api_user@fura.info')
+    expect(payload.profile.displayName).toBe('Legacy API User')
+  })
+
+  it('rejects registration without an email identifier', async () => {
+    sessionCookie = ''
+
+    const response = await apiRequest('/api/auth/register', {
+      method: 'POST',
+      body: {
+        username: 'legacy-user',
+        displayName: 'Legacy User',
+        password: 'secret123',
+      },
+    })
+
+    expect(response.status).toBe(400)
   })
 
   it('rejects reset-password without active session', async () => {
@@ -150,7 +214,7 @@ describe('auth API integration', () => {
     const response = await apiRequest('/api/auth/reset-password', {
       method: 'POST',
       body: {
-        username: 'someone',
+        username: 'someone@example.com',
         password: 'another123',
       },
     })

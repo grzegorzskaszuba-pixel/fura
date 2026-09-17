@@ -1,10 +1,48 @@
 import { describe, expect, it } from 'vitest'
 
+import { db, initializeDatabase } from '@/data/database/db'
 import { profileRepository } from '@/data/repositories/profile-repository'
 import { serviceEventRepository } from '@/data/repositories/service-event-repository'
 import { vehicleRepository } from '@/data/repositories/vehicle-repository'
+import { appAuthService } from '@/features/auth/app-auth-service'
+import { createPasswordHash, verifyPassword } from '@/shared/lib/password'
 
 describe('Repositories', () => {
+  it('migrates legacy local login identifiers without changing passwords', async () => {
+    const profileId = 'legacy-local-profile'
+    const passwordData = await createPasswordHash('legacy-pass-1')
+    const profileTimestamps = {
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    }
+
+    await db.profiles.put({
+      id: profileId,
+      username: 'legacy-local',
+      displayName: 'Legacy Local User',
+      ...profileTimestamps,
+    })
+    await db.authCredentials.put({
+      profileId,
+      username: 'legacy-local',
+      passwordHash: passwordData.hash,
+      passwordSalt: passwordData.salt,
+      ...profileTimestamps,
+    })
+
+    await initializeDatabase()
+
+    const migratedCredential = await db.authCredentials.get(profileId)
+    const migratedProfile = await db.profiles.get(profileId)
+
+    expect(migratedProfile?.username).toBe('legacy-local@fura.info')
+    expect(migratedCredential?.username).toBe('legacy-local@fura.info')
+    expect(migratedCredential?.passwordHash).toBe(passwordData.hash)
+    expect(migratedCredential?.passwordSalt).toBe(passwordData.salt)
+    expect(await verifyPassword('legacy-pass-1', passwordData.salt, passwordData.hash)).toBe(true)
+    expect((await appAuthService.login({ username: 'legacy-local@fura.info', password: 'legacy-pass-1' })).id).toBe(profileId)
+  })
+
   it('filters vehicles by profileId', async () => {
     const primaryProfile = await profileRepository.create({ username: 'repo-1', displayName: 'Repo 1' })
     const secondaryProfile = await profileRepository.create({ username: 'repo-2', displayName: 'Repo 2' })

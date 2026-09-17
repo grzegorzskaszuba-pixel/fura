@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from 'vitest'
 
-import { changePassword, loginProfile, registerProfile, resetPassword } from '../auth-core.mjs'
+import { changePassword, loginProfile, migrateAuthState, registerProfile, resetPassword } from '../auth-core.mjs'
 
 interface AuthState {
   profiles: Array<{
@@ -38,17 +38,17 @@ describe('auth-core unit', () => {
     const state = createState()
 
     const profile = registerProfile(state, {
-      username: 'DriverOne',
+      username: 'DriverOne@example.com',
       displayName: 'Driver One',
       password: 'secret123',
     })
 
-    expect(profile.username).toBe('driverone')
+    expect(profile.username).toBe('driverone@example.com')
     expect(state.profiles).toHaveLength(1)
     expect(state.credentials).toHaveLength(1)
 
     const loggedIn = loginProfile(state, {
-      username: 'driverone',
+      username: 'driverone@example.com',
       password: 'secret123',
     })
 
@@ -59,7 +59,7 @@ describe('auth-core unit', () => {
     const state = createState()
 
     const profile = registerProfile(state, {
-      username: 'owner',
+      username: 'owner@example.com',
       displayName: 'Owner',
       password: 'old-pass-1',
     })
@@ -80,13 +80,13 @@ describe('auth-core unit', () => {
 
     expect(() =>
       loginProfile(state, {
-        username: 'owner',
+        username: 'owner@example.com',
         password: 'old-pass-1',
       }),
     ).toThrow('Nieprawidłowe hasło')
 
     const loggedIn = loginProfile(state, {
-      username: 'owner',
+      username: 'owner@example.com',
       password: 'new-pass-1',
     })
 
@@ -97,21 +97,55 @@ describe('auth-core unit', () => {
     const state = createState()
 
     registerProfile(state, {
-      username: 'recoverable',
+      username: 'recoverable@example.com',
       displayName: 'Recoverable',
       password: 'start-pass-1',
     })
 
     resetPassword(state, {
-      username: 'recoverable',
+      username: 'recoverable@example.com',
       password: 'reset-pass-1',
     })
 
     const loggedIn = loginProfile(state, {
-      username: 'recoverable',
+      username: 'recoverable@example.com',
       password: 'reset-pass-1',
     })
 
-    expect(loggedIn.username).toBe('recoverable')
+    expect(loggedIn.username).toBe('recoverable@example.com')
+  })
+
+  it('migrates legacy usernames without changing password hashes', () => {
+    const state = createState()
+    const profile = registerProfile(state, {
+      username: 'legacy@example.com',
+      displayName: 'Legacy User',
+      password: 'legacy-pass-1',
+    })
+    const credential = state.credentials[0]
+    const originalHash = credential.passwordHash
+    const originalSalt = credential.passwordSalt
+
+    state.profiles[0].username = 'legacy'
+    credential.username = 'legacy'
+
+    expect(migrateAuthState(state)).toBe(true)
+    expect(state.profiles[0].username).toBe('legacy@fura.info')
+    expect(credential.username).toBe('legacy@fura.info')
+    expect(credential.passwordHash).toBe(originalHash)
+    expect(credential.passwordSalt).toBe(originalSalt)
+    expect(loginProfile(state, { username: 'legacy@fura.info', password: 'legacy-pass-1' }).id).toBe(profile.id)
+  })
+
+  it('rejects non-email registration identifiers', () => {
+    const state = createState()
+
+    expect(() =>
+      registerProfile(state, {
+        username: 'legacy-user',
+        displayName: 'Legacy User',
+        password: 'secret123',
+      }),
+    ).toThrow('Podaj prawidłowy adres e-mail')
   })
 })

@@ -8,6 +8,24 @@ const DEMO_PROFILE_IDS = new Set(['profile-demo-main', 'profile-demo-second'])
 const DEMO_USERNAMES = new Set(['demo', 'ania'])
 const CURRENT_PROFILE_KEY = 'currentProfileId'
 
+function isEmail(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
+}
+
+function createLegacyEmail(username: string, usedEmails: Set<string>) {
+  const localPart = username.trim().toLowerCase().replace(/[^a-z0-9._-]+/g, '-').replace(/^[.-]+|[.-]+$/g, '') || 'user'
+  const baseEmail = `${localPart}@fura.info`
+  let email = baseEmail
+  let suffix = 2
+
+  while (usedEmails.has(email)) {
+    email = `${localPart}${suffix}@fura.info`
+    suffix += 1
+  }
+
+  return email
+}
+
 class FuraDatabase extends Dexie {
   profiles!: EntityTable<UserProfile, 'id'>
   authCredentials!: EntityTable<AuthCredentialRecord, 'profileId'>
@@ -106,6 +124,43 @@ async function migrateLegacyData() {
   }
 }
 
+async function migrateAuthIdentityData() {
+  const [profiles, credentials] = await Promise.all([db.profiles.toArray(), db.authCredentials.toArray()])
+  const usedEmails = new Set<string>()
+  const profileUpdates: UserProfile[] = []
+  const credentialUpdates: AuthCredentialRecord[] = []
+
+  for (const profile of profiles) {
+    const credential = credentials.find((entry) => entry.profileId === profile.id)
+    const currentUsername = profile.username.trim().toLowerCase()
+    const email = isEmail(currentUsername) && !usedEmails.has(currentUsername) ? currentUsername : createLegacyEmail(currentUsername, usedEmails)
+
+    usedEmails.add(email)
+
+    if (profile.username !== email) {
+      profileUpdates.push({ ...profile, username: email })
+    }
+
+    if (credential && credential.username !== email) {
+      credentialUpdates.push({ ...credential, username: email })
+    }
+  }
+
+  if (profileUpdates.length === 0 && credentialUpdates.length === 0) {
+    return
+  }
+
+  await db.transaction('rw', db.profiles, db.authCredentials, async () => {
+    if (profileUpdates.length > 0) {
+      await db.profiles.bulkPut(profileUpdates)
+    }
+
+    if (credentialUpdates.length > 0) {
+      await db.authCredentials.bulkPut(credentialUpdates)
+    }
+  })
+}
+
 function isDemoProfile(profile: UserProfile) {
   return DEMO_PROFILE_IDS.has(profile.id) || DEMO_USERNAMES.has(profile.username.toLowerCase())
 }
@@ -176,6 +231,7 @@ async function ensureCurrentProfileExists() {
 export async function initializeDatabase() {
   await migrateLegacyData()
   await removeDemoData()
+  await migrateAuthIdentityData()
   await removeProfilesWithoutCredentials()
   await ensureCurrentProfileExists()
 }

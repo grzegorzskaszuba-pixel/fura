@@ -6,6 +6,7 @@ import {
   changePassword,
   getSessionProfileId,
   loginProfile,
+  normalizeEmail,
   registerProfile,
   resetPassword,
 } from './auth-core.mjs'
@@ -40,6 +41,7 @@ function isInputError(error) {
   const normalized = error.message
     .normalize('NFD')
     .replace(/\p{Diacritic}/gu, '')
+    .replace(/ł/g, 'l')
     .toLowerCase()
 
   return (
@@ -1887,7 +1889,7 @@ async function handleAuthRequest(request, response) {
     const payload = await readJsonBody(request)
 
     if (isPostgresStorage()) {
-      const username = String(payload.username ?? '').trim().toLowerCase()
+      const username = normalizeEmail(payload.username)
       const password = String(payload.password ?? '')
 
       if (username.length < 2) {
@@ -1944,7 +1946,7 @@ async function handleAuthRequest(request, response) {
     const payload = await readJsonBody(request)
 
     if (isPostgresStorage()) {
-      const username = String(payload.username ?? '').trim().toLowerCase()
+      const username = normalizeEmail(payload.username)
       const profileResult = await postgresQuery(
         `
           SELECT
@@ -2094,7 +2096,7 @@ async function handleAuthRequest(request, response) {
     }
 
     const payload = await readJsonBody(request)
-    const payloadUsername = String(payload.username ?? '').trim().toLowerCase()
+    const payloadUsername = normalizeEmail(payload.username)
 
     if (isPostgresStorage()) {
       const credentialResult = await postgresQuery('SELECT username FROM credentials WHERE profile_id = $1 LIMIT 1', [sessionProfileId])
