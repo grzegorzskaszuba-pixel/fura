@@ -60,6 +60,7 @@ const pgPool = usePostgres
 
 let pgInitialized = false
 let normalizedInitialized = false
+let normalizedInitializationPromise = null
 
 export class StorageError extends Error {
   constructor(message, options = {}) {
@@ -250,6 +251,22 @@ async function ensureNormalizedPostgresStorage() {
   if (normalizedInitialized) {
     return
   }
+
+  if (normalizedInitializationPromise) {
+    await normalizedInitializationPromise
+    return
+  }
+
+  normalizedInitializationPromise = initializeNormalizedPostgresStorage()
+
+  try {
+    await normalizedInitializationPromise
+  } finally {
+    normalizedInitializationPromise = null
+  }
+}
+
+async function initializeNormalizedPostgresStorage() {
 
   await withPostgresRetry(async () => {
     await pgPool.query(`
@@ -585,6 +602,15 @@ async function ensureNormalizedPostgresStorage() {
 
 export function isPostgresStorage() {
   return usePostgres
+}
+
+export async function initializeStorage() {
+  if (usePostgres) {
+    await ensureNormalizedPostgresStorage()
+    return
+  }
+
+  await ensureStorageFile()
 }
 
 export async function postgresQuery(queryText, params = []) {

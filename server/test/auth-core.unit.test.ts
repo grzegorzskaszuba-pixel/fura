@@ -137,6 +137,29 @@ describe('auth-core unit', () => {
     expect(loginProfile(state, { username: 'legacy@fura.info', password: 'legacy-pass-1' }).id).toBe(profile.id)
   })
 
+  it('migrates an existing Gmail login when the user logs in with the Fura domain', () => {
+    const state = createState()
+    const profile = registerProfile(state, {
+      username: 'bigdaddysatan@gmail.com',
+      displayName: 'Big Daddy Satan',
+      password: 'legacy-pass-2',
+    })
+    const credential = state.credentials[0]
+    const originalHash = credential.passwordHash
+    const originalSalt = credential.passwordSalt
+
+    const loggedIn = loginProfile(state, {
+      username: 'bigdaddysatan@fura.info',
+      password: 'legacy-pass-2',
+    })
+
+    expect(loggedIn.id).toBe(profile.id)
+    expect(state.profiles[0].username).toBe('bigdaddysatan@fura.info')
+    expect(credential.username).toBe('bigdaddysatan@fura.info')
+    expect(credential.passwordHash).toBe(originalHash)
+    expect(credential.passwordSalt).toBe(originalSalt)
+  })
+
   it('rejects non-email registration identifiers', () => {
     const state = createState()
 

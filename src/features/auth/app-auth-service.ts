@@ -47,6 +47,15 @@ export class AppAuthService implements AuthService {
       throw new Error('Nieprawidłowe hasło')
     }
 
+    const profile = await profileRepository.getById(credentials.profileId)
+
+    if (profile && credentials.username !== normalizedUsername && normalizedUsername.endsWith('@fura.info')) {
+      await Promise.all([
+        profileRepository.upsert({ ...profile, username: normalizedUsername }),
+        authCredentialRepository.updateUsername(credentials.profileId, normalizedUsername),
+      ])
+    }
+
     return setAndReturnProfile(credentials.profileId)
   }
 

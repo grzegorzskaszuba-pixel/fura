@@ -5,12 +5,13 @@ import crypto from 'node:crypto'
 import {
   changePassword,
   getSessionProfileId,
+  getLoginCandidates,
   loginProfile,
   normalizeEmail,
   registerProfile,
   resetPassword,
 } from './auth-core.mjs'
-import { StorageError, isPostgresStorage, postgresQuery, postgresTransaction, readState, writeState } from './storage.mjs'
+import { StorageError, initializeStorage, isPostgresStorage, postgresQuery, postgresTransaction, readState, writeState } from './storage.mjs'
 
 const PORT = Number(process.env.AUTH_API_PORT ?? process.env.PORT ?? 8787)
 const HOST = process.env.AUTH_API_HOST ?? '0.0.0.0'
@@ -1962,10 +1963,10 @@ async function handleAuthRequest(request, response) {
             c.updated_at AS credential_updated_at
           FROM profiles p
           JOIN credentials c ON c.profile_id = p.id
-          WHERE p.username = $1
+          WHERE p.username = ANY($1::text[])
           LIMIT 1
         `,
-        [username],
+        [getLoginCandidates(username)],
       )
 
       let row = profileResult.rows[0]
@@ -2027,10 +2028,10 @@ async function handleAuthRequest(request, response) {
                   c.updated_at AS credential_updated_at
                 FROM profiles p
                 JOIN credentials c ON c.profile_id = p.id
-                WHERE p.username = $1
+                WHERE p.username = ANY($1::text[])
                 LIMIT 1
               `,
-              [username],
+              [getLoginCandidates(username)],
             )
 
             row = refreshedResult.rows[0]
@@ -2049,7 +2050,7 @@ async function handleAuthRequest(request, response) {
         profiles: [
           {
             id: row.id,
-            username: row.username,
+            username,
             displayName: row.display_name,
             createdAt: row.created_at,
             updatedAt: row.updated_at,
@@ -2058,7 +2059,7 @@ async function handleAuthRequest(request, response) {
         credentials: [
           {
             profileId: row.profile_id,
-            username: row.username,
+            username,
             passwordHash: row.password_hash,
             passwordSalt: row.password_salt,
             createdAt: row.credential_created_at,
@@ -2070,6 +2071,16 @@ async function handleAuthRequest(request, response) {
       }
 
       const profile = loginProfile(localState, payload)
+
+      if (row.username !== username) {
+        await postgresTransaction(async (client) => {
+          const temporaryUsername = `migration-${row.id}@fura.info`
+          await client.query('UPDATE profiles SET username = $1 WHERE id = $2', [temporaryUsername, row.id])
+          await client.query('UPDATE credentials SET username = $1 WHERE profile_id = $2', [temporaryUsername, row.id])
+          await client.query('UPDATE profiles SET username = $1 WHERE id = $2', [username, row.id])
+          await client.query('UPDATE credentials SET username = $1 WHERE profile_id = $2', [username, row.id])
+        })
+      }
 
       const sessionId = createSession(profile.id)
       setSessionCookie(response, sessionId)
@@ -2305,7 +2316,17 @@ const server = http.createServer(async (request, response) => {
   }
 })
 
-server.listen(PORT, HOST, () => {
+async function startServer() {
+  await initializeStorage()
+
+  server.listen(PORT, HOST, () => {
+    // eslint-disable-next-line no-console
+    console.log(`[auth-api] listening on http://${HOST}:${PORT}`)
+  })
+}
+
+void startServer().catch((error) => {
   // eslint-disable-next-line no-console
-  console.log(`[auth-api] listening on http://${HOST}:${PORT}`)
+  console.error('[auth-api] failed to initialize storage', error)
+  process.exitCode = 1
 })

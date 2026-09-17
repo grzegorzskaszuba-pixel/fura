@@ -42,6 +42,18 @@ function createLegacyEmail(username, usedEmails) {
   return email
 }
 
+export function getLoginCandidates(email) {
+  const normalizedEmail = normalizeEmail(email)
+  const candidates = [normalizedEmail]
+
+  if (normalizedEmail.endsWith('@fura.info')) {
+    const localPart = normalizedEmail.slice(0, -'@fura.info'.length)
+    candidates.push(`${localPart}@gmail.com`)
+  }
+
+  return candidates
+}
+
 function hashPassword(password, salt) {
   return crypto.scryptSync(password, salt, 64).toString('hex')
 }
@@ -132,7 +144,7 @@ export function loginProfile(state, input) {
   const username = normalizeEmail(input.username)
   const password = String(input.password ?? '')
 
-  const credentials = state.credentials.find((entry) => entry.username === username)
+  const credentials = state.credentials.find((entry) => getLoginCandidates(username).includes(entry.username))
 
   if (!credentials) {
     throw new Error('Nie znaleziono profilu o podanej nazwie użytkownika')
@@ -148,6 +160,11 @@ export function loginProfile(state, input) {
 
   if (!profile) {
     throw new Error('Profil nie istnieje')
+  }
+
+  if (credentials.username !== username) {
+    credentials.username = username
+    profile.username = username
   }
 
   profile.updatedAt = now()

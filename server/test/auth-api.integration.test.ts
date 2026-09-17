@@ -193,6 +193,36 @@ describe('auth API integration', () => {
     expect(payload.profile.displayName).toBe('Legacy API User')
   })
 
+  it('accepts the Fura-domain alias for an existing Gmail account', async () => {
+    const stamp = Date.now()
+    const gmailUsername = `bigdaddysatan_${stamp}@gmail.com`
+    const furaUsername = `bigdaddysatan_${stamp}@fura.info`
+
+    const register = await apiRequest('/api/auth/register', {
+      method: 'POST',
+      body: {
+        username: gmailUsername,
+        displayName: 'Big Daddy Satan',
+        password: 'legacy-pass-2',
+      },
+    })
+
+    expect(register.status).toBe(200)
+
+    const login = await apiRequest('/api/auth/login', {
+      method: 'POST',
+      body: {
+        username: furaUsername,
+        password: 'legacy-pass-2',
+      },
+    })
+    const payload = (await login.json()) as { profile: { username: string; displayName: string } }
+
+    expect(login.status).toBe(200)
+    expect(payload.profile.username).toBe(furaUsername)
+    expect(payload.profile.displayName).toBe('Big Daddy Satan')
+  })
+
   it('rejects registration without an email identifier', async () => {
     sessionCookie = ''
 

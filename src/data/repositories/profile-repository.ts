@@ -51,13 +51,26 @@ export const profileRepository = {
 
   async getByUsername(username: string): Promise<UserProfile | null> {
     const normalizedUsername = normalizeUsername(username)
+    const candidates = [normalizedUsername]
+
+    if (normalizedUsername.endsWith('@fura.info')) {
+      candidates.push(`${normalizedUsername.slice(0, -'@fura.info'.length)}@gmail.com`)
+    }
 
     if (!isRemoteMode()) {
-      return (await db.profiles.where('username').equalsIgnoreCase(normalizedUsername).first()) ?? null
+      for (const candidate of candidates) {
+        const profile = await db.profiles.where('username').equalsIgnoreCase(candidate).first()
+
+        if (profile) {
+          return profile
+        }
+      }
+
+      return null
     }
 
     const response = await httpRequest<{ profiles: UserProfile[] }>(profilesBaseUrl)
-    return response.profiles.find((profile) => profile.username.toLowerCase() === normalizedUsername) ?? null
+    return response.profiles.find((profile) => candidates.includes(profile.username.toLowerCase())) ?? null
   },
 
   async create(input: ProfileCreateInput): Promise<UserProfile> {
