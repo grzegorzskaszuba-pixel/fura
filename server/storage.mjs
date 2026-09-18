@@ -17,6 +17,7 @@ const emptyState = {
   serviceEvents: [],
   shareBrochures: [],
   emailVerificationTokens: [],
+  pendingEmailRegistrations: [],
 }
 
 const storageMode = String(process.env.AUTH_STORAGE ?? '').trim().toLowerCase()
@@ -219,6 +220,7 @@ function normalizeState(candidate) {
     serviceEvents: Array.isArray(candidate.serviceEvents) ? candidate.serviceEvents : [],
     shareBrochures: Array.isArray(candidate.shareBrochures) ? candidate.shareBrochures : [],
     emailVerificationTokens: Array.isArray(candidate.emailVerificationTokens) ? candidate.emailVerificationTokens : [],
+    pendingEmailRegistrations: Array.isArray(candidate.pendingEmailRegistrations) ? candidate.pendingEmailRegistrations : [],
   }
 
   return normalized
@@ -407,6 +409,22 @@ async function initializeNormalizedPostgresStorage() {
     `)
 
     await pgPool.query('CREATE INDEX IF NOT EXISTS email_verification_tokens_profile_idx ON email_verification_tokens (profile_id)')
+
+    await pgPool.query(`
+      CREATE TABLE IF NOT EXISTS pending_email_registrations (
+        id UUID PRIMARY KEY,
+        username TEXT UNIQUE NOT NULL,
+        display_name TEXT NOT NULL,
+        password_hash TEXT NOT NULL,
+        password_salt TEXT NOT NULL,
+        token_hash TEXT UNIQUE NOT NULL,
+        expires_at TIMESTAMPTZ NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL,
+        used_at TIMESTAMPTZ
+      )
+    `)
+
+    await pgPool.query('CREATE INDEX IF NOT EXISTS pending_email_registrations_expires_idx ON pending_email_registrations (expires_at)')
   })
 
   await withPostgresRetry(async () => {

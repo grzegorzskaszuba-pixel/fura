@@ -139,9 +139,9 @@ Endpoint wymaga jednoczesnie `RESEND_API_KEY` i `RESEND_TEST_TOKEN` w `fura-api`
 
 Scenariusz MVP:
 
-1. Rejestracja tworzy konto bez sesji i wysyla link wazny 24 godziny.
-2. Wejscie w link otwiera `/verify-email?token=...` i aktywuje konto.
-3. Logowanie przed aktywacja jest blokowane.
+1. Rejestracja zapisuje oczekujace zgloszenie bez tworzenia profilu i sesji, a nastepnie wysyla link wazny 24 godziny.
+2. Wejscie w link otwiera `/verify-email?token=...` i dopiero wtedy tworzy aktywny profil oraz dane logowania.
+3. Niepoprawny token, wygasniecie lub blad wysylki nie tworza profilu.
 4. Ekran oczekiwania pozwala wyslac link ponownie; poprzedni token zostaje uniewazniony.
 
 Pokrycie automatyczne:

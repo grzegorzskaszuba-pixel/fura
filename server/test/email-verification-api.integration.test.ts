@@ -76,6 +76,9 @@ describe('email verification API integration', () => {
     const profileId = 'verification-profile'
     const token = 'verification-token'
     const salt = 'verification-salt'
+    const pendingProfileId = 'pending-profile'
+    const pendingToken = 'pending-token'
+    const pendingSalt = 'pending-salt'
     const port = await findFreePort()
     baseUrl = `http://127.0.0.1:${port}`
 
@@ -115,6 +118,19 @@ describe('email verification API integration', () => {
             usedAt: null,
           },
         ],
+        pendingEmailRegistrations: [
+          {
+            id: pendingProfileId,
+            username: 'pending@example.com',
+            displayName: 'Pending User',
+            passwordHash: crypto.scryptSync('secret123', pendingSalt, 64).toString('hex'),
+            passwordSalt: pendingSalt,
+            tokenHash: hashEmailVerificationToken(pendingToken),
+            expiresAt: '2026-09-19T00:00:00.000Z',
+            createdAt: '2026-09-18T00:00:00.000Z',
+            usedAt: null,
+          },
+        ],
       }),
       'utf8',
     )
@@ -127,6 +143,7 @@ describe('email verification API integration', () => {
         AUTH_API_HOST: '127.0.0.1',
         AUTH_DB_FILE: dbFile,
         AUTH_EMAIL_VERIFICATION_ENABLED: 'true',
+        RESEND_API_KEY: '',
       },
       stdio: 'pipe',
     })
@@ -162,5 +179,42 @@ describe('email verification API integration', () => {
     })
 
     expect(login.status).toBe(200)
+  })
+
+  it('promotes a pending registration only after the token is verified', async () => {
+    const blockedLogin = await apiRequest('/api/auth/login', {
+      username: 'pending@example.com',
+      password: 'secret123',
+    })
+
+    expect(blockedLogin.status).toBe(403)
+
+    const verification = await apiRequest('/api/auth/verify-email', { token: 'pending-token' })
+    expect(verification.status).toBe(200)
+
+    const login = await apiRequest('/api/auth/login', {
+      username: 'pending@example.com',
+      password: 'secret123',
+    })
+
+    expect(login.status).toBe(200)
+  })
+
+  it('does not persist a profile when the verification email cannot be sent', async () => {
+    const username = `email-failure-${Date.now()}@example.com`
+    const register = await apiRequest('/api/auth/register', {
+      username,
+      displayName: 'Email Failure',
+      password: 'secret123',
+    })
+
+    expect(register.status).toBe(500)
+
+    const login = await apiRequest('/api/auth/login', {
+      username,
+      password: 'secret123',
+    })
+
+    expect(login.status).toBe(400)
   })
 })

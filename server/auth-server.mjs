@@ -1956,6 +1956,40 @@ async function handleAuthRequest(request, response) {
 
     if (isPostgresStorage()) {
       const profileId = await postgresTransaction(async (client) => {
+        const pendingResult = await client.query(
+          `
+            SELECT id, username, display_name, password_hash, password_salt, created_at
+            FROM pending_email_registrations
+            WHERE token_hash = $1
+              AND used_at IS NULL
+              AND expires_at > NOW()
+            FOR UPDATE
+          `,
+          [tokenHash],
+        )
+        const pending = pendingResult.rows[0]
+
+        if (pending) {
+          const verifiedAt = new Date().toISOString()
+
+          await client.query(
+            `
+              INSERT INTO profiles (id, username, display_name, created_at, updated_at, email_verified_at)
+              VALUES ($1, $2, $3, $4, $5, $6)
+            `,
+            [pending.id, pending.username, pending.display_name, pending.created_at, verifiedAt, verifiedAt],
+          )
+          await client.query(
+            `
+              INSERT INTO credentials (profile_id, username, password_hash, password_salt, created_at, updated_at)
+              VALUES ($1, $2, $3, $4, $5, $6)
+            `,
+            [pending.id, pending.username, pending.password_hash, pending.password_salt, pending.created_at, verifiedAt],
+          )
+          await client.query('DELETE FROM pending_email_registrations WHERE id = $1', [pending.id])
+          return pending.id
+        }
+
         const tokenResult = await client.query(
           `
             UPDATE email_verification_tokens AS verification
@@ -1994,6 +2028,32 @@ async function handleAuthRequest(request, response) {
     }
 
     const state = await readState()
+    const pending = (state.pendingEmailRegistrations ?? []).find((entry) => entry.tokenHash === tokenHash)
+
+    if (pending && isEmailVerificationTokenUsable(pending)) {
+      const verifiedAt = new Date().toISOString()
+      state.profiles.push({
+        id: pending.id,
+        username: pending.username,
+        displayName: pending.displayName,
+        createdAt: pending.createdAt,
+        updatedAt: verifiedAt,
+        emailVerifiedAt: verifiedAt,
+      })
+      state.credentials.push({
+        profileId: pending.id,
+        username: pending.username,
+        passwordHash: pending.passwordHash,
+        passwordSalt: pending.passwordSalt,
+        createdAt: pending.createdAt,
+        updatedAt: verifiedAt,
+      })
+      state.pendingEmailRegistrations = (state.pendingEmailRegistrations ?? []).filter((entry) => entry.id !== pending.id)
+      await writeState(state)
+      setJson(response, 200, { ok: true })
+      return
+    }
+
     const verification = (state.emailVerificationTokens ?? []).find((entry) => entry.tokenHash === tokenHash)
     const profile = verification ? state.profiles.find((entry) => entry.id === verification.profileId) : null
 
@@ -2016,6 +2076,27 @@ async function handleAuthRequest(request, response) {
     const username = normalizeEmail(payload.username)
 
     if (isPostgresStorage()) {
+      const pendingResult = await postgresQuery(
+        'SELECT id FROM pending_email_registrations WHERE username = $1 LIMIT 1',
+        [username],
+      )
+      const pending = pendingResult.rows[0]
+
+      if (pending) {
+        const emailVerification = createEmailVerificationToken(pending.id)
+        await postgresQuery(
+          `
+            UPDATE pending_email_registrations
+            SET token_hash = $1, expires_at = $2, created_at = $3, used_at = NULL
+            WHERE id = $4
+          `,
+          [emailVerification.record.tokenHash, emailVerification.record.expiresAt, emailVerification.record.createdAt, pending.id],
+        )
+        await sendEmailVerificationEmail(username, emailVerification.token)
+        setJson(response, 200, { ok: true })
+        return
+      }
+
       const result = await postgresQuery('SELECT id, username, email_verified_at FROM profiles WHERE username = $1 LIMIT 1', [username])
       const profile = result.rows[0]
 
@@ -2042,6 +2123,20 @@ async function handleAuthRequest(request, response) {
     }
 
     const state = await readState()
+    const pending = (state.pendingEmailRegistrations ?? []).find((entry) => entry.username === username)
+
+    if (pending) {
+      const emailVerification = createEmailVerificationToken(pending.id)
+      pending.tokenHash = emailVerification.record.tokenHash
+      pending.expiresAt = emailVerification.record.expiresAt
+      pending.createdAt = emailVerification.record.createdAt
+      pending.usedAt = null
+      await writeState(state)
+      await sendEmailVerificationEmail(username, emailVerification.token)
+      setJson(response, 200, { ok: true })
+      return
+    }
+
     const profile = state.profiles.find((entry) => entry.username === username)
 
     if (!profile || profile.emailVerifiedAt) {
@@ -2080,6 +2175,54 @@ async function handleAuthRequest(request, response) {
       const credential = localState.credentials[0]
       const emailVerification = EMAIL_VERIFICATION_ENABLED ? createEmailVerificationToken(profile.id) : null
 
+      if (emailVerification) {
+        const existingProfile = await postgresQuery('SELECT id FROM profiles WHERE username = $1 LIMIT 1', [profile.username])
+        const existingPending = await postgresQuery('SELECT id FROM pending_email_registrations WHERE username = $1 LIMIT 1', [profile.username])
+
+        if (existingProfile.rows[0] || existingPending.rows[0]) {
+          setJson(response, 400, { message: 'Taki profil już istnieje' })
+          return
+        }
+
+        await sendEmailVerificationEmail(profile.username, emailVerification.token)
+
+        try {
+          await postgresTransaction(async (client) => {
+            await client.query(
+              `
+                INSERT INTO pending_email_registrations (
+                  id, username, display_name, password_hash, password_salt,
+                  token_hash, expires_at, created_at
+                )
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+              `,
+              [
+                profile.id,
+                profile.username,
+                profile.displayName,
+                credential.passwordHash,
+                credential.passwordSalt,
+                emailVerification.record.tokenHash,
+                emailVerification.record.expiresAt,
+                emailVerification.record.createdAt,
+              ],
+            )
+          })
+        } catch (error) {
+          const errorCode = error instanceof StorageError ? error.cause?.code : error?.code
+
+          if (errorCode === '23505') {
+            setJson(response, 400, { message: 'Taki profil już istnieje' })
+            return
+          }
+
+          throw error
+        }
+
+        setJson(response, 200, { profile: sanitizeProfile(profile), verificationRequired: true })
+        return
+      }
+
       try {
         await postgresTransaction(async (client) => {
           await client.query(
@@ -2091,29 +2234,16 @@ async function handleAuthRequest(request, response) {
             [credential.profileId, credential.username, credential.passwordHash, credential.passwordSalt, credential.createdAt, credential.updatedAt],
           )
 
-          if (emailVerification) {
-            await client.query(
-              `
-                INSERT INTO email_verification_tokens (id, profile_id, token_hash, expires_at, created_at)
-                VALUES ($1, $2, $3, $4, $5)
-              `,
-              [emailVerification.record.id, emailVerification.record.profileId, emailVerification.record.tokenHash, emailVerification.record.expiresAt, emailVerification.record.createdAt],
-            )
-          }
         })
       } catch (error) {
-        if (typeof error === 'object' && error !== null && 'code' in error && error.code === '23505') {
+        const errorCode = error instanceof StorageError ? error.cause?.code : error?.code
+
+        if (errorCode === '23505') {
           setJson(response, 400, { message: 'Taki profil już istnieje' })
           return
         }
 
         throw error
-      }
-
-      if (emailVerification) {
-        await sendEmailVerificationEmail(profile.username, emailVerification.token)
-        setJson(response, 200, { profile: sanitizeProfile(profile), verificationRequired: true })
-        return
       }
 
       const sessionId = createSession(profile.id)
@@ -2123,28 +2253,49 @@ async function handleAuthRequest(request, response) {
     }
 
     const state = await readState()
-    const profile = registerProfile(state, payload)
-    const storedProfile = state.profiles.find((entry) => entry.id === profile.id)
+    const registrationState = {
+      profiles: [...state.profiles],
+      credentials: [...state.credentials],
+    }
+    const profile = registerProfile(registrationState, payload)
+    const storedProfile = registrationState.profiles.find((entry) => entry.id === profile.id)
 
     if (!storedProfile) {
       throw new Error('Nie udało się zapisać profilu')
     }
 
     const emailVerification = EMAIL_VERIFICATION_ENABLED ? createEmailVerificationToken(profile.id) : null
-    storedProfile.emailVerifiedAt = emailVerification ? null : storedProfile.createdAt
 
     if (emailVerification) {
-      state.emailVerificationTokens = (state.emailVerificationTokens ?? []).filter((entry) => entry.profileId !== profile.id)
-      state.emailVerificationTokens.push(emailVerification.record)
-    }
+      const existingPending = (state.pendingEmailRegistrations ?? []).some((entry) => entry.username === profile.username)
 
-    await writeState(state)
+      if (existingPending) {
+        setJson(response, 400, { message: 'Taki profil już istnieje' })
+        return
+      }
 
-    if (emailVerification) {
       await sendEmailVerificationEmail(profile.username, emailVerification.token)
+      state.pendingEmailRegistrations = state.pendingEmailRegistrations ?? []
+      state.pendingEmailRegistrations.push({
+        id: storedProfile.id,
+        username: storedProfile.username,
+        displayName: storedProfile.displayName,
+        passwordHash: registrationState.credentials[registrationState.credentials.length - 1].passwordHash,
+        passwordSalt: registrationState.credentials[registrationState.credentials.length - 1].passwordSalt,
+        tokenHash: emailVerification.record.tokenHash,
+        expiresAt: emailVerification.record.expiresAt,
+        createdAt: emailVerification.record.createdAt,
+        usedAt: null,
+      })
+      await writeState(state)
       setJson(response, 200, { profile: sanitizeProfile(profile), verificationRequired: true })
       return
     }
+
+    storedProfile.emailVerifiedAt = storedProfile.createdAt
+    state.profiles.push(storedProfile)
+    state.credentials.push(registrationState.credentials[registrationState.credentials.length - 1])
+    await writeState(state)
 
     const sessionId = createSession(profile.id)
     setSessionCookie(response, sessionId)
@@ -2254,6 +2405,13 @@ async function handleAuthRequest(request, response) {
       }
 
       if (!row) {
+        const pendingResult = await postgresQuery('SELECT id FROM pending_email_registrations WHERE username = $1 LIMIT 1', [username])
+
+        if (pendingResult.rows[0]) {
+          setJson(response, 403, { message: 'Potwierdź adres e-mail przed zalogowaniem' })
+          return
+        }
+
         setJson(response, 400, { message: 'Nie znaleziono profilu o podanej nazwie użytkownika' })
         return
       }
@@ -2307,6 +2465,13 @@ async function handleAuthRequest(request, response) {
     }
 
     const state = await readState()
+    const pendingRegistration = (state.pendingEmailRegistrations ?? []).find((entry) => getLoginCandidates(payload.username).includes(entry.username))
+
+    if (pendingRegistration) {
+      setJson(response, 403, { message: 'Potwierdź adres e-mail przed zalogowaniem' })
+      return
+    }
+
     const existingProfile = state.profiles.find((entry) => getLoginCandidates(payload.username).includes(entry.username))
 
     if (EMAIL_VERIFICATION_ENABLED && existingProfile?.emailVerifiedAt === null) {
