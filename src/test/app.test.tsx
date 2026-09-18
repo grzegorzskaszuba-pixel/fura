@@ -31,6 +31,23 @@ describe('App MVP flow', () => {
     })
   })
 
+  it('requires confirmation before permanently deleting the account', async () => {
+    const user = await openAppSession()
+
+    await user.click(screen.getByTestId('profile-menu-trigger'))
+    await user.click(await screen.findByRole('menuitem', { name: 'Tester' }))
+    await screen.findByText('Usuń konto użytkownika')
+
+    expect(screen.queryByText('Czy przed usunięciem chcesz wyeksportować raport swoich samochodów do pliku?')).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Usuń konto bezpowrotnie' }))
+    const confirmationDialog = await screen.findByRole('alertdialog')
+    expect(confirmationDialog).toHaveTextContent('Ta operacja jest permanentna i bezpowrotnie usunie profil, samochody, wpisy serwisowe, zdjęcia, załączniki oraz pozostałe dane.')
+
+    await user.click(screen.getByRole('button', { name: 'Anuluj' }))
+    expect(screen.getByTestId('active-vehicle-name')).toBeInTheDocument()
+  })
+
   it('adds a vehicle', async () => {
     const user = await openAppSession()
     const imageFile = new File(['vehicle-image'], 'octavia.png', { type: 'image/png' })

@@ -67,6 +67,19 @@ export class RemoteAuthService implements AuthService {
     })
   }
 
+  async deleteAccount(profileId: string) {
+    await httpRequest<void>(`${this.baseUrl}/delete-account`, {
+      method: 'POST',
+      body: {
+        profileId,
+        confirm: true,
+      },
+    })
+
+    clearSessionToken()
+    await appStateRepository.setCurrentProfileId(null)
+  }
+
   async logout() {
     let requestError: unknown = null
 

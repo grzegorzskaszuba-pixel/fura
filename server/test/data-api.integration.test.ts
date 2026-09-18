@@ -498,4 +498,78 @@ describe('data API integration', () => {
     const listAfterPayload = (await listAfter.response.json()) as { brochures: Array<{ id: string }> }
     expect(listAfterPayload.brochures).toHaveLength(0)
   })
+
+  it('deletes all remote account-owned vehicle data and share links', async () => {
+    const stamp = Date.now()
+    const registerA = await apiRequest('/api/auth/register', {
+      method: 'POST',
+      body: {
+        username: `account_delete_a_${stamp}@example.com`,
+        displayName: 'Account Delete A',
+        password: 'secret123',
+      },
+    })
+    const registerAPayload = (await registerA.response.json()) as { profile: { id: string } }
+    const cookieA = registerA.nextCookie as string
+    const registerB = await apiRequest('/api/auth/register', {
+      method: 'POST',
+      body: {
+        username: `account_delete_b_${stamp}@example.com`,
+        displayName: 'Account Delete B',
+        password: 'secret123',
+      },
+    })
+    const cookieB = registerB.nextCookie as string
+
+    const createVehicle = await apiRequest('/api/vehicles', {
+      method: 'POST',
+      cookie: cookieA,
+      body: {
+        name: 'Toyota GR Yaris',
+        make: 'Toyota',
+        model: 'GR Yaris',
+      },
+    })
+    const vehicle = (await createVehicle.response.json()) as { vehicle: { id: string } }
+
+    const createEvent = await apiRequest('/api/service-events', {
+      method: 'POST',
+      cookie: cookieA,
+      body: {
+        vehicleId: vehicle.vehicle.id,
+        status: 'completed',
+        category: 'repair',
+        title: 'Wymiana hamulcow',
+        attachments: [{ id: 'account-delete-attachment', name: 'rachunek.png', previewUrl: 'data:image/png;base64,ZmFrZQ==' }],
+      },
+    })
+    expect(createEvent.response.status).toBe(200)
+
+    const createShare = await apiRequest('/api/share-brochures', {
+      method: 'POST',
+      cookie: cookieA,
+      body: { vehicleId: vehicle.vehicle.id },
+    })
+    const sharePayload = (await createShare.response.json()) as { url: string }
+
+    const deleteAccount = await apiRequest('/api/auth/delete-account', {
+      method: 'POST',
+      cookie: cookieA,
+      body: {
+        profileId: registerAPayload.profile.id,
+        confirm: true,
+      },
+    })
+
+    expect(deleteAccount.response.status).toBe(200)
+
+    const publicShare = await fetch(sharePayload.url)
+    expect(publicShare.status).toBe(404)
+
+    const remainingProfileVehicles = await apiRequest('/api/vehicles', { cookie: cookieB })
+    const remainingPayload = (await remainingProfileVehicles.response.json()) as { vehicles: unknown[] }
+
+    expect(remainingProfileVehicles.response.status).toBe(200)
+    expect(remainingPayload.vehicles).toHaveLength(0)
+  })
 })

@@ -1,9 +1,10 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type MouseEvent } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 
 import { ResponsiveModal } from '@/shared/components/responsive-modal'
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/shared/components/ui/alert-dialog'
 import { Button } from '@/shared/components/ui/button'
 import { Input } from '@/shared/components/ui/input'
 import { Label } from '@/shared/components/ui/label'
@@ -26,6 +27,7 @@ const passwordSchema = z
 
 type ProfileValues = z.infer<typeof profileSchema>
 type PasswordValues = z.infer<typeof passwordSchema>
+const ACCOUNT_REPORT_EXPORT_PROMPT_ENABLED = false
 
 interface ProfileSettingsModalProps {
   open: boolean
@@ -33,6 +35,8 @@ interface ProfileSettingsModalProps {
   currentProfile: UserProfile
   onUpdateProfile: (values: { displayName: string }) => Promise<void>
   onChangePassword: (values: { currentPassword: string; newPassword: string }) => Promise<void>
+  onDeleteAccount: () => Promise<void>
+  onExportAccountReport?: () => Promise<void>
 }
 
 export function ProfileSettingsModal({
@@ -41,11 +45,17 @@ export function ProfileSettingsModal({
   currentProfile,
   onUpdateProfile,
   onChangePassword,
+  onDeleteAccount,
+  onExportAccountReport,
 }: ProfileSettingsModalProps) {
   const [profileError, setProfileError] = useState<string | null>(null)
   const [passwordError, setPasswordError] = useState<string | null>(null)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
   const [isProfileSubmitting, setIsProfileSubmitting] = useState(false)
   const [isPasswordSubmitting, setIsPasswordSubmitting] = useState(false)
+  const [isDeleteSubmitting, setIsDeleteSubmitting] = useState(false)
+  const [isExportSubmitting, setIsExportSubmitting] = useState(false)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
 
   const profileForm = useForm<ProfileValues>({
     resolver: zodResolver(profileSchema),
@@ -97,6 +107,35 @@ export function ProfileSettingsModal({
     }
   }
 
+  async function handleDeleteAccount(event: MouseEvent<HTMLButtonElement>) {
+    event.preventDefault()
+    setDeleteError(null)
+    setIsDeleteSubmitting(true)
+
+    try {
+      await onDeleteAccount()
+      setDeleteDialogOpen(false)
+    } catch (submitError) {
+      setDeleteError(submitError instanceof Error ? submitError.message : 'Nie udało się usunąć konta')
+    } finally {
+      setIsDeleteSubmitting(false)
+    }
+  }
+
+  async function handleExportAccountReport() {
+    if (!onExportAccountReport) {
+      return
+    }
+
+    setIsExportSubmitting(true)
+
+    try {
+      await onExportAccountReport()
+    } finally {
+      setIsExportSubmitting(false)
+    }
+  }
+
   return (
     <ResponsiveModal
       open={open}
@@ -104,6 +143,8 @@ export function ProfileSettingsModal({
         if (!nextOpen) {
           setProfileError(null)
           setPasswordError(null)
+          setDeleteError(null)
+          setDeleteDialogOpen(false)
           passwordForm.reset()
           profileForm.reset({
             displayName: currentProfile.displayName ?? currentProfile.username,
@@ -176,7 +217,65 @@ export function ProfileSettingsModal({
             </Button>
           </div>
         </form>
+
+        <div className="h-px bg-zinc-200" />
+
+        <section className="space-y-3">
+          <div>
+            <h3 className="text-sm font-semibold uppercase tracking-[0.08em] text-red-700">Usuń konto użytkownika</h3>
+            <p className="mt-2 text-sm leading-6 text-zinc-500">
+              Usunięcie konta jest permanentne. Wszystkie dane konta, samochody, wpisy serwisowe, zdjęcia i załączniki zostaną usunięte bez możliwości przywrócenia.
+            </p>
+          </div>
+
+          <Button type="button" variant="destructive" onClick={() => setDeleteDialogOpen(true)}>
+            Usuń konto bezpowrotnie
+          </Button>
+        </section>
       </div>
+
+      <AlertDialog
+        open={deleteDialogOpen}
+        onOpenChange={(nextOpen) => {
+          setDeleteDialogOpen(nextOpen)
+          if (!nextOpen) {
+            setDeleteError(null)
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Usunąć konto użytkownika?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Czy na pewno chcesz usunąć konto? Ta operacja jest permanentna i bezpowrotnie usunie profil, samochody, wpisy serwisowe, zdjęcia, załączniki oraz pozostałe dane.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          {ACCOUNT_REPORT_EXPORT_PROMPT_ENABLED && onExportAccountReport ? (
+            <div className="space-y-3 rounded-xl border border-zinc-200 bg-zinc-50 p-4">
+              <p className="text-sm text-zinc-700">Czy przed usunięciem chcesz wyeksportować raport swoich samochodów do pliku?</p>
+              <Button type="button" variant="outline" disabled={isExportSubmitting} onClick={() => void handleExportAccountReport()}>
+                Wyeksportuj raport
+              </Button>
+            </div>
+          ) : null}
+
+          {deleteError ? <p className="text-sm text-red-600">{deleteError}</p> : null}
+
+          <AlertDialogFooter>
+            <AlertDialogCancel asChild>
+              <Button type="button" variant="ghost" disabled={isDeleteSubmitting}>
+                Anuluj
+              </Button>
+            </AlertDialogCancel>
+            <AlertDialogAction asChild>
+              <Button type="button" variant="destructive" disabled={isDeleteSubmitting} onClick={handleDeleteAccount}>
+                {isDeleteSubmitting ? 'Usuwanie...' : 'Usuń konto bezpowrotnie'}
+              </Button>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </ResponsiveModal>
   )
 }

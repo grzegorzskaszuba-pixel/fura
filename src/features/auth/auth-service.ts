@@ -6,5 +6,6 @@ export interface AuthService {
   register(input: RegisterCredentials): Promise<UserProfile>
   resetPassword(input: LoginCredentials): Promise<void>
   changePassword(profileId: string, input: { currentPassword: string; newPassword: string }): Promise<void>
+  deleteAccount(profileId: string): Promise<void>
   logout(): Promise<void>
 }

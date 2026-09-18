@@ -440,10 +440,7 @@ export default function App() {
     setDetailEventId(null)
   }
 
-  async function handleLogout() {
-    setAppError(null)
-
-    // Optimistic local logout so UI switches to auth screen immediately.
+  function clearAuthenticatedWorkspace() {
     setCurrentProfileId(null)
     setCurrentProfile(null)
     setVehicles([])
@@ -460,12 +457,27 @@ export default function App() {
     setShareExpiresAt(null)
     setShareError(null)
     setIsShareLoading(false)
+  }
+
+  async function handleLogout() {
+    setAppError(null)
+    clearAuthenticatedWorkspace()
 
     try {
       await authService.logout()
     } catch (error) {
       setAppError(error instanceof Error ? error.message : 'Wylogowano lokalnie, ale nie udało się zamknąć wszystkich sesji na serwerze.')
     }
+  }
+
+  async function handleDeleteAccount() {
+    if (!currentProfile) {
+      return
+    }
+
+    setAppError(null)
+    await authService.deleteAccount(currentProfile.id)
+    clearAuthenticatedWorkspace()
   }
 
   async function loadActiveShareLink(vehicleId: string) {
@@ -774,6 +786,7 @@ export default function App() {
         onChangePassword={async (values) => {
           await authService.changePassword(currentProfile.id, values)
         }}
+        onDeleteAccount={handleDeleteAccount}
       />
 
       <AlertDialog open={deleteVehicleDialogOpen} onOpenChange={setDeleteVehicleDialogOpen}>

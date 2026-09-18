@@ -1,7 +1,7 @@
 // @vitest-environment node
 
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import crypto from 'node:crypto'
 import net from 'node:net'
 import os from 'node:os'
@@ -259,5 +259,68 @@ describe('auth API integration', () => {
     })
 
     expect(response.status).toBe(404)
+  })
+
+  it('permanently deletes the active profile and invalidates its session', async () => {
+    sessionCookie = ''
+    const stamp = Date.now()
+
+    const keepResponse = await apiRequest('/api/auth/register', {
+      method: 'POST',
+      body: {
+        username: `keep_${stamp}@example.com`,
+        displayName: 'Keep User',
+        password: 'secret123',
+      },
+    })
+    const keepPayload = (await keepResponse.json()) as { profile: { id: string } }
+
+    expect(keepResponse.status).toBe(200)
+
+    const deleteResponse = await apiRequest('/api/auth/register', {
+      method: 'POST',
+      body: {
+        username: `delete_${stamp}@example.com`,
+        displayName: 'Delete User',
+        password: 'secret123',
+      },
+    })
+    const deletePayload = (await deleteResponse.json()) as { profile: { id: string } }
+
+    expect(deleteResponse.status).toBe(200)
+
+    const response = await apiRequest('/api/auth/delete-account', {
+      method: 'POST',
+      body: {
+        profileId: deletePayload.profile.id,
+        confirm: true,
+      },
+    })
+
+    expect(response.status).toBe(200)
+
+    const sessionResponse = await apiRequest('/api/auth/session')
+    const sessionPayload = (await sessionResponse.json()) as { profileId: string | null }
+    expect(sessionPayload.profileId).toBeNull()
+
+    const storedState = JSON.parse(await readFile(path.join(tempDir, 'auth-db.json'), 'utf8')) as {
+      profiles: Array<{ id: string }>
+      credentials: Array<{ profileId: string }>
+    }
+
+    expect(storedState.profiles.some((profile) => profile.id === deletePayload.profile.id)).toBe(false)
+    expect(storedState.credentials.some((credential) => credential.profileId === deletePayload.profile.id)).toBe(false)
+
+    const keepLogin = await apiRequest('/api/auth/login', {
+      method: 'POST',
+      body: {
+        username: `keep_${stamp}@example.com`,
+        password: 'secret123',
+      },
+    })
+    const keepLoginPayload = (await keepLogin.json()) as { profile: { id: string } }
+
+    expect(keepLogin.status).toBe(200)
+    expect(keepLoginPayload.profile.id).toBe(keepPayload.profile.id)
   })
 })

@@ -214,6 +214,19 @@ export function changePassword(state, input) {
   credentials.updatedAt = now()
 }
 
+export function removeProfileData(state, profileId) {
+  const normalizedProfileId = String(profileId ?? '')
+  const profileCount = Array.isArray(state.profiles) ? state.profiles.length : 0
+
+  state.profiles = (state.profiles ?? []).filter((profile) => profile.id !== normalizedProfileId)
+  state.credentials = (state.credentials ?? []).filter((credential) => credential.profileId !== normalizedProfileId)
+  state.vehicles = (state.vehicles ?? []).filter((vehicle) => vehicle.profileId !== normalizedProfileId)
+  state.serviceEvents = (state.serviceEvents ?? []).filter((event) => event.profileId !== normalizedProfileId)
+  state.shareBrochures = (state.shareBrochures ?? []).filter((brochure) => brochure.profileId !== normalizedProfileId)
+
+  return state.profiles.length !== profileCount
+}
+
 export function migrateAuthState(state) {
   const usedEmails = new Set()
   let changed = false

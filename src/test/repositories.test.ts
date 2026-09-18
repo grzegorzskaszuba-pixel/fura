@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { db, initializeDatabase } from '@/data/database/db'
+import { appStateRepository } from '@/data/repositories/app-state-repository'
 import { profileRepository } from '@/data/repositories/profile-repository'
 import { serviceEventRepository } from '@/data/repositories/service-event-repository'
 import { vehicleRepository } from '@/data/repositories/vehicle-repository'
@@ -237,5 +238,36 @@ describe('Repositories', () => {
 
     expect(savedVehicle).toBeNull()
     expect(events).toHaveLength(0)
+  })
+
+  it('removes the complete local account including attachments and profile state', async () => {
+    const { accountRepository } = await import('@/data/repositories/account-repository')
+    const profile = await appAuthService.register({
+      username: 'repo-delete-account@example.com',
+      displayName: 'Repo Delete Account',
+      password: 'secret123',
+    })
+    const vehicle = await vehicleRepository.create(profile.id, {
+      name: 'Volvo V60',
+      make: 'Volvo',
+      model: 'V60',
+      imageUrl: 'data:image/png;base64,ZmFrZQ==',
+    })
+    const event = await serviceEventRepository.create(profile.id, vehicle.id, {
+      status: 'completed',
+      category: 'repair',
+      title: 'Naprawa',
+      attachments: [{ id: 'attachment-account', name: 'rachunek.png', previewUrl: 'data:image/png;base64,ZmFrZQ==' }],
+    })
+
+    await appStateRepository.setCurrentVehicleId(profile.id, vehicle.id)
+    await accountRepository.deleteByProfileId(profile.id)
+
+    expect(await db.profiles.get(profile.id)).toBeUndefined()
+    expect(await db.authCredentials.get(profile.id)).toBeUndefined()
+    expect(await db.vehicles.get(vehicle.id)).toBeUndefined()
+    expect(await db.serviceEvents.get(event.id)).toBeUndefined()
+    expect(await appStateRepository.getCurrentProfileId()).toBeNull()
+    expect(await appStateRepository.getCurrentVehicleId(profile.id)).toBeNull()
   })
 })

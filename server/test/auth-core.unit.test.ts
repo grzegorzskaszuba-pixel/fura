@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from 'vitest'
 
-import { changePassword, loginProfile, migrateAuthState, registerProfile, resetPassword } from '../auth-core.mjs'
+import { changePassword, loginProfile, migrateAuthState, registerProfile, removeProfileData, resetPassword } from '../auth-core.mjs'
 
 interface AuthState {
   profiles: Array<{
@@ -170,5 +170,30 @@ describe('auth-core unit', () => {
         password: 'secret123',
       }),
     ).toThrow('Podaj prawidłowy adres e-mail')
+  })
+
+  it('removes every profile-owned record including shared brochure data', () => {
+    const state = createState() as AuthState & { shareBrochures: Array<{ profileId: string }> }
+    state.shareBrochures = []
+
+    const profile = registerProfile(state, {
+      username: 'deletable@example.com',
+      displayName: 'Deletable User',
+      password: 'secret123',
+    })
+
+    state.vehicles.push({ profileId: profile.id })
+    state.serviceEvents.push({ profileId: profile.id })
+    state.shareBrochures.push({ profileId: profile.id })
+    state.vehicles.push({ profileId: 'other-profile' })
+    state.serviceEvents.push({ profileId: 'other-profile' })
+    state.shareBrochures.push({ profileId: 'other-profile' })
+
+    expect(removeProfileData(state, profile.id)).toBe(true)
+    expect(state.profiles).toHaveLength(0)
+    expect(state.credentials).toHaveLength(0)
+    expect(state.vehicles).toEqual([{ profileId: 'other-profile' }])
+    expect(state.serviceEvents).toEqual([{ profileId: 'other-profile' }])
+    expect(state.shareBrochures).toEqual([{ profileId: 'other-profile' }])
   })
 })

@@ -8,6 +8,7 @@ import {
   getLoginCandidates,
   loginProfile,
   normalizeEmail,
+  removeProfileData,
   registerProfile,
   resetPassword,
 } from './auth-core.mjs'
@@ -2278,6 +2279,55 @@ async function handleAuthRequest(request, response) {
     const state = await readState()
     changePassword(state, payload)
     await writeState(state)
+    setJson(response, 200, { ok: true })
+    return
+  }
+
+  if (pathname === '/api/auth/delete-account' && method === 'POST') {
+    const payload = await readJsonBody(request)
+    const sessionProfileId = getSessionProfileId(sessions, getRequestSessionId(request))
+
+    if (!sessionProfileId || sessionProfileId !== payload.profileId) {
+      setJson(response, 403, { message: 'Brak aktywnej sesji profilu' })
+      return
+    }
+
+    if (payload.confirm !== true) {
+      setJson(response, 400, { message: 'Usunięcie konta wymaga potwierdzenia' })
+      return
+    }
+
+    if (isPostgresStorage()) {
+      await postgresTransaction(async (client) => {
+        const deletedProfile = await client.query('DELETE FROM profiles WHERE id = $1 RETURNING id', [sessionProfileId])
+
+        if (!deletedProfile.rows[0]) {
+          throw new Error('Profil nie istnieje')
+        }
+
+        const legacyStateResult = await client.query('SELECT state FROM app_state WHERE id = 1 FOR UPDATE')
+        const legacyState = legacyStateResult.rows[0]?.state
+
+        if (legacyState && typeof legacyState === 'object') {
+          removeProfileData(legacyState, sessionProfileId)
+          await client.query('UPDATE app_state SET state = $1::jsonb, updated_at = NOW() WHERE id = 1', [JSON.stringify(legacyState)])
+        }
+      })
+      cachedLegacyState = null
+    } else {
+      const state = await readState()
+
+      if (!removeProfileData(state, sessionProfileId)) {
+        setJson(response, 404, { message: 'Profil nie istnieje' })
+        return
+      }
+
+      await writeState(state)
+      cachedLegacyState = state
+    }
+
+    invalidateProfileSessions(sessionProfileId)
+    clearSessionCookie(response)
     setJson(response, 200, { ok: true })
     return
   }

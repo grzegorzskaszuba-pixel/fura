@@ -1,4 +1,5 @@
 import { appStateRepository } from '@/data/repositories/app-state-repository'
+import { accountRepository } from '@/data/repositories/account-repository'
 import { authCredentialRepository } from '@/data/repositories/auth-credential-repository'
 import { initializeDatabase } from '@/data/database/db'
 import { profileRepository } from '@/data/repositories/profile-repository'
@@ -121,6 +122,11 @@ export class AppAuthService implements AuthService {
       passwordHash: passwordData.hash,
       passwordSalt: passwordData.salt,
     })
+  }
+
+  async deleteAccount(profileId: string) {
+    await initializeDatabase()
+    await accountRepository.deleteByProfileId(profileId)
   }
 
   async logout() {
