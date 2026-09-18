@@ -641,7 +641,7 @@ export async function postgresTransaction(callback) {
   }
 
   await ensureNormalizedPostgresStorage()
-  const client = monitorPostgresClient(await pgPool.connect(), 'transaction')
+  const client = monitorPostgresClient(await withPostgresRetry(() => pgPool.connect()), 'transaction')
 
   try {
     await client.query('BEGIN')
