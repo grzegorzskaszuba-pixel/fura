@@ -18,17 +18,14 @@ import { ShareBrochureModal } from '@/features/vehicles/share-brochure-modal'
 import { VehicleCarousel } from '@/features/vehicles/vehicle-carousel'
 import { VehicleForm } from '@/features/vehicles/vehicle-form'
 import { EmptyState } from '@/shared/components/empty-state'
+import { BrandLogo } from '@/shared/components/brand-logo'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/shared/components/ui/alert-dialog'
 import { Button } from '@/shared/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/shared/components/ui/dropdown-menu'
 import { getDefaultVehicleImage } from '@/shared/constants/vehicle-images'
-import { cn, getTodayIsoDate } from '@/shared/lib/utils'
+import { getTodayIsoDate } from '@/shared/lib/utils'
 import { sortEventsAsc, sortEventsDesc } from '@/shared/lib/format'
 import type { ServiceEvent, ServiceEventFormValues, ServiceTab, UserProfile, Vehicle, VehicleFormValues } from '@/shared/types/domain'
-
-const LOGO_PHASE_INTERVAL_MS = 10000
-const logoPhases = ['pill', 'icon'] as const
-type LogoPhase = (typeof logoPhases)[number]
 
 export default function App() {
   const [serviceTab, setServiceTab] = useState<ServiceTab>('history')
@@ -48,7 +45,6 @@ export default function App() {
   const [isServiceEventsLoading, setIsServiceEventsLoading] = useState(false)
   const [isBootstrapping, setIsBootstrapping] = useState(true)
   const [appError, setAppError] = useState<string | null>(null)
-  const [logoPhaseIndex, setLogoPhaseIndex] = useState(0)
   const [deleteVehicleDialogOpen, setDeleteVehicleDialogOpen] = useState(false)
   const [shareModalOpen, setShareModalOpen] = useState(false)
   const [shareId, setShareId] = useState<string | null>(null)
@@ -62,7 +58,6 @@ export default function App() {
   const editingVehicle = useMemo(() => vehicles.find((vehicle) => vehicle.id === editingVehicleId) ?? null, [editingVehicleId, vehicles])
   const editingEvent = useMemo(() => serviceEvents.find((event) => event.id === editingEventId) ?? null, [editingEventId, serviceEvents])
   const detailEvent = useMemo(() => serviceEvents.find((event) => event.id === detailEventId) ?? null, [detailEventId, serviceEvents])
-  const logoPhase: LogoPhase = logoPhases[logoPhaseIndex]
   const completedEvents = useMemo(() => sortEventsDesc(serviceEvents.filter((event) => event.status === 'completed')), [serviceEvents])
   const plannedEvents = useMemo(() => sortEventsAsc(serviceEvents.filter((event) => event.status === 'planned')), [serviceEvents])
   const visibleEvents = useMemo(() => (serviceTab === 'history' ? completedEvents : plannedEvents), [completedEvents, plannedEvents, serviceTab])
@@ -124,16 +119,6 @@ export default function App() {
 
     return () => {
       mounted = false
-    }
-  }, [])
-
-  useEffect(() => {
-    const phaseInterval = window.setInterval(() => {
-      setLogoPhaseIndex((prev) => (prev + 1) % logoPhases.length)
-    }, LOGO_PHASE_INTERVAL_MS)
-
-    return () => {
-      window.clearInterval(phaseInterval)
     }
   }, [])
 
@@ -607,33 +592,7 @@ export default function App() {
               </DropdownMenu>
             ) : null}
           </div>
-          <div className="relative inline-flex h-14 w-[188px] items-center justify-end" aria-label="Branding FURA">
-            <span
-              aria-hidden="true"
-              className={cn(
-                'absolute right-0 top-1/2 inline-flex h-14 -translate-y-1/2 items-center justify-center overflow-hidden rounded-full bg-white p-2 text-white shadow-sm ring-1 ring-zinc-200/80 transition-all duration-700 ease-in-out',
-                logoPhase === 'pill' ? 'w-[152px] opacity-100' : 'w-14 opacity-100',
-              )}
-            >
-              <span className="absolute inset-2 rounded-full bg-zinc-950" />
-              <span
-                className={cn(
-                  'absolute inset-0 z-10 grid place-items-center text-[30px] font-semibold leading-none tracking-[-0.06em] transition-opacity duration-500',
-                  logoPhase === 'pill' ? 'opacity-100' : 'opacity-0',
-                )}
-              >
-                FURA
-              </span>
-              <span
-                className={cn(
-                  'absolute inset-0 z-10 grid place-items-center text-[30px] font-semibold leading-none tracking-[-0.03em] transition-opacity duration-500',
-                  logoPhase === 'icon' ? 'opacity-100' : 'opacity-0',
-                )}
-              >
-                F
-              </span>
-            </span>
-          </div>
+          <BrandLogo />
         </header>
 
         {vehicles.length === 0 ? (

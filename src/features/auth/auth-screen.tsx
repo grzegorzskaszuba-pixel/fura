@@ -5,6 +5,7 @@ import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 
 import { Button } from '@/shared/components/ui/button'
+import { BrandLogo } from '@/shared/components/brand-logo'
 import { Card, CardContent } from '@/shared/components/ui/card'
 import { Input } from '@/shared/components/ui/input'
 import { Label } from '@/shared/components/ui/label'
@@ -74,9 +75,7 @@ export function AuthScreen({ onLogin, onRegister, onResetPassword, allowResetPas
         <CardContent className="p-6 sm:p-8 lg:p-10">
           <div className="mx-auto max-w-md space-y-7">
             <div className="space-y-4">
-              <div className="inline-flex items-center rounded-full border border-zinc-900 bg-zinc-950 px-3 py-2">
-                <span className="text-3xl font-semibold tracking-[-0.08em] text-white sm:text-5xl">FURA</span>
-              </div>
+              <BrandLogo />
               <p className="text-base font-medium leading-7 text-zinc-950 sm:text-lg">Prosty dziennik serwisowy dla każdego auta.</p>
               {startupError ? <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">{startupError}</p> : null}
             </div>
