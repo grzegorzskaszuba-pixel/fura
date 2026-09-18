@@ -379,11 +379,7 @@ async function initializeNormalizedPostgresStorage() {
     await ensurePostgresStorage()
     const legacyResult = await pgPool.query('SELECT state FROM app_state WHERE id = 1 LIMIT 1')
     const legacyState = normalizeState(legacyResult.rows[0]?.state ?? emptyState)
-    const legacyStateChanged = migrateAuthState(legacyState)
-
-    if (legacyStateChanged) {
-      await pgPool.query('UPDATE app_state SET state = $1::jsonb, updated_at = NOW() WHERE id = 1', [JSON.stringify(legacyState)])
-    }
+    migrateAuthState(legacyState)
 
     const normalizedAuthResult = await pgPool.query(`
       SELECT
@@ -459,7 +455,13 @@ async function initializeNormalizedPostgresStorage() {
       }
     }
 
-    if (legacyState.profiles.length === 0 && legacyState.credentials.length === 0 && legacyState.vehicles.length === 0 && legacyState.serviceEvents.length === 0) {
+    if (
+      legacyState.profiles.length === 0 &&
+      legacyState.credentials.length === 0 &&
+      legacyState.vehicles.length === 0 &&
+      legacyState.serviceEvents.length === 0 &&
+      legacyState.shareBrochures.length === 0
+    ) {
       return
     }
 
@@ -596,6 +598,9 @@ async function initializeNormalizedPostgresStorage() {
           ],
         )
       }
+
+      await client.query('DELETE FROM app_state WHERE id = 1')
+      await client.query('INSERT INTO app_state (id, state) VALUES (1, $1::jsonb)', [JSON.stringify(emptyState)])
 
       await client.query('COMMIT')
     } catch (error) {

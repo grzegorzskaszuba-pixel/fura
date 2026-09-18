@@ -2320,14 +2320,6 @@ async function handleAuthRequest(request, response) {
         if (!deletedProfile.rows[0]) {
           throw new Error('Profil nie istnieje')
         }
-
-        const legacyStateResult = await client.query('SELECT state FROM app_state WHERE id = 1 FOR UPDATE')
-        const legacyState = legacyStateResult.rows[0]?.state
-
-        if (legacyState && typeof legacyState === 'object') {
-          removeProfileData(legacyState, sessionProfileId)
-          await client.query('UPDATE app_state SET state = $1::jsonb, updated_at = NOW() WHERE id = 1', [JSON.stringify(legacyState)])
-        }
       })
       cachedLegacyState = null
     } else {

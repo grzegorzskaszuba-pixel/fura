@@ -57,6 +57,6 @@ services:
 
 databases:
   - name: fura-db
-    plan: free
+    plan: 0.1c-256mb
     databaseName: fura
     user: fura_user
