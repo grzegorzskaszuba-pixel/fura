@@ -119,13 +119,21 @@ Przyklad:
 
 ### 4.6 Smoke test wysylki emaila
 
-Jednorazowy test przez Resend uruchamiany w backendzie:
+Na planie Render z dostepnym Shell mozna uruchomic test bezposrednio w backendzie:
 
 ```bash
 npm run email:test -- grzegorz.s.kaszuba@gmail.com
 ```
 
-Komenda wymaga `RESEND_API_KEY` ustawionego w srodowisku `fura-api` i nie jest wywolywana przez frontend.
+Na planie Free nalezy tymczasowo dodac w `fura-api` zmienna `RESEND_TEST_TOKEN`, wykonac redeploy, a nastepnie wywolac backendowy endpoint z PowerShella:
+
+```powershell
+$headers = @{ 'X-Resend-Test-Token' = '<wartosc-RESEND_TEST_TOKEN>' }
+$body = @{ to = 'grzegorz.s.kaszuba@gmail.com' } | ConvertTo-Json
+Invoke-RestMethod -Method Post -Uri 'https://api.fura.info/api/email/test' -Headers $headers -ContentType 'application/json' -Body $body
+```
+
+Endpoint wymaga jednoczesnie `RESEND_API_KEY` i `RESEND_TEST_TOKEN` w `fura-api`; bez tokenu zwraca `404` i pozostaje nieaktywny. Po potwierdzeniu wysylki usun `RESEND_TEST_TOKEN` z Render.
 
 ## 5. Komendy uruchamiania testow
 

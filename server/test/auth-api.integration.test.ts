@@ -134,6 +134,7 @@ describe('auth API integration', () => {
         AUTH_API_HOST: '127.0.0.1',
         AUTH_API_ALLOWED_ORIGINS: 'https://fura.info/',
         AUTH_DB_FILE: dbFile,
+        RESEND_TEST_TOKEN: '',
       },
       stdio: 'pipe',
     })
@@ -147,6 +148,15 @@ describe('auth API integration', () => {
     }
 
     await rm(tempDir, { recursive: true, force: true })
+  })
+
+  it('does not expose the email test route without its dedicated token', async () => {
+    const response = await apiRequest('/api/email/test', {
+      method: 'POST',
+      body: { to: 'grzegorz.s.kaszuba@gmail.com' },
+    })
+
+    expect(response.status).toBe(404)
   })
 
   it('returns only current session profile from /api/profiles', async () => {

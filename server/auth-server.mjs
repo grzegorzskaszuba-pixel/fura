@@ -12,11 +12,13 @@ import {
   registerProfile,
   resetPassword,
 } from './auth-core.mjs'
+import { sendTestEmail } from './email-service.mjs'
 import { StorageError, initializeStorage, isPostgresStorage, postgresQuery, postgresTransaction, readState, writeState } from './storage.mjs'
 
 const PORT = Number(process.env.AUTH_API_PORT ?? process.env.PORT ?? 8787)
 const HOST = process.env.AUTH_API_HOST ?? '0.0.0.0'
 const SESSION_COOKIE = 'fura_session'
+const RESEND_TEST_TOKEN = String(process.env.RESEND_TEST_TOKEN ?? '').trim()
 const COOKIE_SAME_SITE = String(process.env.AUTH_COOKIE_SAME_SITE ?? 'Lax')
 const COOKIE_SECURE =
   String(process.env.AUTH_COOKIE_SECURE ?? '').trim().toLowerCase() === 'true' ||
@@ -234,6 +236,23 @@ function getRequestSessionId(request) {
 
 function getAuthenticatedProfileId(request) {
   return getSessionProfileId(sessions, getRequestSessionId(request))
+}
+
+function hasValidResendTestToken(request) {
+  if (!RESEND_TEST_TOKEN) {
+    return false
+  }
+
+  const requestToken = request.headers['x-resend-test-token']
+
+  if (typeof requestToken !== 'string') {
+    return false
+  }
+
+  const expected = Buffer.from(RESEND_TEST_TOKEN)
+  const received = Buffer.from(requestToken.trim())
+
+  return expected.length === received.length && crypto.timingSafeEqual(expected, received)
 }
 
 async function getCachedLegacyState() {
@@ -975,6 +994,23 @@ async function handleAuthRequest(request, response) {
       uptimeSeconds: Math.floor(process.uptime()),
       sessions: sessions.size,
     })
+    return
+  }
+
+  if (pathname === '/api/email/test' && method === 'POST') {
+    if (!RESEND_TEST_TOKEN) {
+      setJson(response, 404, { message: 'Not found' })
+      return
+    }
+
+    if (!hasValidResendTestToken(request)) {
+      setJson(response, 401, { message: 'Invalid email test token' })
+      return
+    }
+
+    const payload = await readJsonBody(request)
+    const result = await sendTestEmail(payload.to)
+    setJson(response, 200, { ok: true, id: result?.id ?? null })
     return
   }
 
