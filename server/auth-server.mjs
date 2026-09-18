@@ -20,7 +20,8 @@ const PORT = Number(process.env.AUTH_API_PORT ?? process.env.PORT ?? 8787)
 const HOST = process.env.AUTH_API_HOST ?? '0.0.0.0'
 const SESSION_COOKIE = 'fura_session'
 const RESEND_TEST_TOKEN = String(process.env.RESEND_TEST_TOKEN ?? '').trim()
-const EMAIL_VERIFICATION_ENABLED = String(process.env.AUTH_EMAIL_VERIFICATION_ENABLED ?? 'true').trim().toLowerCase() !== 'false'
+const configuredEmailVerification = String(process.env.AUTH_EMAIL_VERIFICATION_ENABLED ?? 'true').trim().toLowerCase() !== 'false'
+const EMAIL_VERIFICATION_ENABLED = process.env.RENDER === 'true' ? true : configuredEmailVerification
 const COOKIE_SAME_SITE = String(process.env.AUTH_COOKIE_SAME_SITE ?? 'Lax')
 const COOKIE_SECURE =
   String(process.env.AUTH_COOKIE_SECURE ?? '').trim().toLowerCase() === 'true' ||
@@ -2776,7 +2777,7 @@ async function startServer() {
 
   server.listen(PORT, HOST, () => {
     // eslint-disable-next-line no-console
-    console.log(`[auth-api] listening on http://${HOST}:${PORT}`)
+    console.log(`[auth-api] listening on http://${HOST}:${PORT}; email verification enabled=${EMAIL_VERIFICATION_ENABLED}`)
   })
 }
 
