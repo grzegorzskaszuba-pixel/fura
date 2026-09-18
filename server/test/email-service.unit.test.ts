@@ -52,13 +52,17 @@ describe('email service', () => {
     await expect(sendTestEmail('  grzegorz.s.kaszuba@gmail.com  ')).resolves.toEqual({ id: 'email-test-id' })
 
     expect(ResendMock).toHaveBeenCalledWith('test-key')
-    expect(sendMock).toHaveBeenCalledWith({
+    const emailPayload = sendMock.mock.calls[0]?.[0] as { from: string; to: string; subject: string; html: string; text: string }
+
+    expect(emailPayload).toMatchObject({
       from: 'FURA <no-reply@fura.info>',
       to: 'grzegorz.s.kaszuba@gmail.com',
       subject: 'FURA test email',
-      html: '<p>This is a test email from FURA.</p>',
-      text: 'This is a test email from FURA.',
+      text: 'FURA\n\nFURA test email\n\nThis is a test email from FURA.\n\nFURA\nSimple service log for every car.',
     })
+    expect(emailPayload.html).toContain('FURA test email')
+    expect(emailPayload.html).toContain('This is a test email from FURA.')
+    expect(emailPayload.html).toContain('Simple service log for every car.')
   })
 
   it('converts a Resend provider error into a readable error', async () => {
@@ -75,12 +79,18 @@ describe('email service', () => {
 
     await expect(sendEmailVerificationEmail('driver@example.com', 'verification-token')).resolves.toEqual({ id: 'verification-email-id' })
 
-    expect(sendMock).toHaveBeenCalledWith({
+    const emailPayload = sendMock.mock.calls[0]?.[0] as { from: string; to: string; subject: string; html: string; text: string }
+
+    expect(emailPayload).toMatchObject({
       from: 'FURA <no-reply@fura.info>',
       to: 'driver@example.com',
       subject: 'Confirm your FURA email address',
-      html: '<p>Welcome to FURA.</p><p><a href="https://fura.info/verify-email?token=verification-token">Confirm your email address</a> to activate your account.</p><p>This link expires in 24 hours.</p>',
-      text: 'Welcome to FURA. Confirm your email address: https://fura.info/verify-email?token=verification-token\n\nThis link expires in 24 hours.',
+      text: 'FURA\n\nConfirm your email address\n\nWelcome to FURA. Confirm your email address to activate your account.\n\nThis link expires in 24 hours.\n\nConfirm email address: https://fura.info/verify-email?token=verification-token\n\nFURA\nSimple service log for every car.',
     })
+    expect(emailPayload.html).toContain('Confirm your email address')
+    expect(emailPayload.html).toContain('Confirm email address')
+    expect(emailPayload.html).toContain('https://fura.info/verify-email?token=verification-token')
+    expect(emailPayload.html).toContain('Simple service log for every car.')
+    expect(emailPayload.html).toContain('#f97316')
   })
 })

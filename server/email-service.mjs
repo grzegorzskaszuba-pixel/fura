@@ -1,11 +1,10 @@
 import { Resend } from 'resend'
 
 import { getEmailVerificationUrl } from './email-verification.mjs'
+import { renderFuraEmailNote, renderFuraEmailTemplate, renderFuraEmailText } from './email-template.mjs'
 
 const EMAIL_FROM = 'FURA <no-reply@fura.info>'
 const TEST_SUBJECT = 'FURA test email'
-const TEST_HTML = '<p>This is a test email from FURA.</p>'
-const TEST_TEXT = 'This is a test email from FURA.'
 const VERIFICATION_SUBJECT = 'Confirm your FURA email address'
 
 function getResendApiKey() {
@@ -45,21 +44,48 @@ async function sendEmail({ to, subject, html, text }) {
 }
 
 export function sendTestEmail(to) {
+  const title = 'FURA test email'
+  const intro = 'This is a test email from FURA.'
+
   return sendEmail({
     to,
     subject: TEST_SUBJECT,
-    html: TEST_HTML,
-    text: TEST_TEXT,
+    html: renderFuraEmailTemplate({
+      preheader: intro,
+      title,
+      intro,
+    }),
+    text: renderFuraEmailText({
+      title,
+      intro,
+    }),
   })
 }
 
 export function sendEmailVerificationEmail(to, token) {
   const verificationUrl = getEmailVerificationUrl(token)
+  const title = 'Confirm your email address'
+  const intro = 'Welcome to FURA. Confirm your email address to activate your account.'
+  const action = {
+    label: 'Confirm email address',
+    url: verificationUrl,
+  }
 
   return sendEmail({
     to,
     subject: VERIFICATION_SUBJECT,
-    html: `<p>Welcome to FURA.</p><p><a href="${verificationUrl}">Confirm your email address</a> to activate your account.</p><p>This link expires in 24 hours.</p>`,
-    text: `Welcome to FURA. Confirm your email address: ${verificationUrl}\n\nThis link expires in 24 hours.`,
+    html: renderFuraEmailTemplate({
+      preheader: 'Confirm your FURA email address',
+      title,
+      intro,
+      contentHtml: renderFuraEmailNote('This link expires in 24 hours.'),
+      action,
+    }),
+    text: renderFuraEmailText({
+      title,
+      intro,
+      bodyText: 'This link expires in 24 hours.',
+      action,
+    }),
   })
 }
