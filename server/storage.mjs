@@ -211,7 +211,9 @@ function normalizeState(candidate) {
   }
 
   const normalized = {
-    profiles: candidate.profiles,
+    profiles: candidate.profiles.map((profile) =>
+      Object.prototype.hasOwnProperty.call(profile, 'emailVerifiedAt') ? profile : { ...profile, emailVerifiedAt: profile.createdAt },
+    ),
     credentials: candidate.credentials,
     vehicles: Array.isArray(candidate.vehicles) ? candidate.vehicles : [],
     serviceEvents: Array.isArray(candidate.serviceEvents) ? candidate.serviceEvents : [],

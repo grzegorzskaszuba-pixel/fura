@@ -1,9 +1,10 @@
-import { act, render, screen } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import App from '@/app/App'
 import { appAuthService } from '@/features/auth/app-auth-service'
 import { AuthScreen } from '@/features/auth/auth-screen'
+import { EmailVerificationScreen } from '@/features/auth/email-verification-screen'
 
 describe('Auth screen regression', () => {
   afterEach(() => {
@@ -41,5 +42,25 @@ describe('Auth screen regression', () => {
 
     expect(screen.getByText('FURA')).toHaveClass('opacity-0')
     expect(screen.getByText('F', { exact: true })).toHaveClass('opacity-100')
+  })
+
+  it('shows the verification error instead of keeping the loading state', async () => {
+    render(
+      <EmailVerificationScreen
+        token="invalid-token"
+        onVerify={async () => {
+          throw new Error('Link weryfikacyjny jest nieprawidłowy, zużyty lub wygasł')
+        }}
+        onBackToLogin={() => undefined}
+      />,
+    )
+
+    expect(screen.getByText('Potwierdzanie adresu e-mail...')).toBeInTheDocument()
+
+    await waitFor(() => {
+      expect(screen.getByText('Link weryfikacyjny jest nieprawidłowy, zużyty lub wygasł')).toBeInTheDocument()
+    })
+
+    expect(screen.queryByText('Potwierdzanie adresu e-mail...')).not.toBeInTheDocument()
   })
 })

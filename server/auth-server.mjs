@@ -2124,8 +2124,14 @@ async function handleAuthRequest(request, response) {
 
     const state = await readState()
     const profile = registerProfile(state, payload)
+    const storedProfile = state.profiles.find((entry) => entry.id === profile.id)
+
+    if (!storedProfile) {
+      throw new Error('Nie udało się zapisać profilu')
+    }
+
     const emailVerification = EMAIL_VERIFICATION_ENABLED ? createEmailVerificationToken(profile.id) : null
-    profile.emailVerifiedAt = emailVerification ? null : profile.createdAt
+    storedProfile.emailVerifiedAt = emailVerification ? null : storedProfile.createdAt
 
     if (emailVerification) {
       state.emailVerificationTokens = (state.emailVerificationTokens ?? []).filter((entry) => entry.profileId !== profile.id)
