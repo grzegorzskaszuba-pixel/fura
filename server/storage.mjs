@@ -185,6 +185,15 @@ if (pgPool) {
   })
 }
 
+function monitorPostgresClient(client, context) {
+  client.on('error', (error) => {
+    // eslint-disable-next-line no-console
+    console.error(`[storage] postgres client error during ${context}:`, error)
+  })
+
+  return client
+}
+
 async function ensureStorageFile() {
   await mkdir(dataDir, { recursive: true })
 
@@ -412,7 +421,7 @@ async function initializeNormalizedPostgresStorage() {
     const normalizedAuthChanged = migrateAuthState(normalizedAuthState)
 
     if (normalizedAuthChanged) {
-      const client = await pgPool.connect()
+      const client = monitorPostgresClient(await pgPool.connect(), 'auth migration')
 
       try {
         await client.query('BEGIN')
@@ -454,7 +463,7 @@ async function initializeNormalizedPostgresStorage() {
       return
     }
 
-    const client = await pgPool.connect()
+    const client = monitorPostgresClient(await pgPool.connect(), 'legacy data migration')
 
     try {
       await client.query('BEGIN')
@@ -632,7 +641,7 @@ export async function postgresTransaction(callback) {
   }
 
   await ensureNormalizedPostgresStorage()
-  const client = await pgPool.connect()
+  const client = monitorPostgresClient(await pgPool.connect(), 'transaction')
 
   try {
     await client.query('BEGIN')
@@ -640,7 +649,13 @@ export async function postgresTransaction(callback) {
     await client.query('COMMIT')
     return result
   } catch (error) {
-    await client.query('ROLLBACK')
+    try {
+      await client.query('ROLLBACK')
+    } catch (rollbackError) {
+      // eslint-disable-next-line no-console
+      console.error('[storage] postgres transaction rollback failed:', rollbackError)
+    }
+
     throw toStorageError(error)
   } finally {
     client.release()
