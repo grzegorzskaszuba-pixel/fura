@@ -22,9 +22,23 @@ const COOKIE_SECURE =
   String(process.env.AUTH_COOKIE_SECURE ?? '').trim().toLowerCase() === 'true' ||
   COOKIE_SAME_SITE.toLowerCase() === 'none' ||
   process.env.RENDER === 'true'
+function normalizeOrigin(origin) {
+  const value = String(origin ?? '').trim()
+
+  if (!value || value === '*') {
+    return value
+  }
+
+  try {
+    return new URL(value).origin
+  } catch {
+    return value.replace(/\/+$/, '')
+  }
+}
+
 const ALLOWED_ORIGINS = String(process.env.AUTH_API_ALLOWED_ORIGINS ?? '*')
   .split(',')
-  .map((origin) => origin.trim())
+  .map(normalizeOrigin)
   .filter((origin) => origin.length > 0)
 const sessions = new Map()
 const startedAt = new Date().toISOString()
@@ -81,15 +95,17 @@ function mapErrorToResponse(error) {
 }
 
 function getAllowedOrigin(requestOrigin) {
-  if (!requestOrigin) {
+  const normalizedRequestOrigin = normalizeOrigin(requestOrigin)
+
+  if (!normalizedRequestOrigin) {
     return null
   }
 
   if (ALLOWED_ORIGINS.includes('*')) {
-    return requestOrigin
+    return normalizedRequestOrigin
   }
 
-  return ALLOWED_ORIGINS.includes(requestOrigin) ? requestOrigin : null
+  return ALLOWED_ORIGINS.includes(normalizedRequestOrigin) ? normalizedRequestOrigin : null
 }
 
 function setCorsHeaders(request, response) {

@@ -61,9 +61,13 @@ describe('auth API integration', () => {
   let tempDir = ''
   let sessionCookie = ''
 
-  async function apiRequest(pathname: string, options?: { method?: string; body?: unknown }) {
+  async function apiRequest(pathname: string, options?: { method?: string; body?: unknown; origin?: string }) {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
+    }
+
+    if (options?.origin) {
+      headers.origin = options.origin
     }
 
     if (sessionCookie) {
@@ -128,7 +132,7 @@ describe('auth API integration', () => {
         ...process.env,
         AUTH_API_PORT: String(port),
         AUTH_API_HOST: '127.0.0.1',
-        AUTH_API_ALLOWED_ORIGINS: '*',
+        AUTH_API_ALLOWED_ORIGINS: 'https://fura.info/',
         AUTH_DB_FILE: dbFile,
       },
       stdio: 'pipe',
@@ -259,6 +263,16 @@ describe('auth API integration', () => {
     })
 
     expect(response.status).toBe(404)
+  })
+
+  it('keeps CORS enabled when an allowed origin has a trailing slash in configuration', async () => {
+    const response = await apiRequest('/api/auth/delete-account', {
+      method: 'OPTIONS',
+      origin: 'https://fura.info',
+    })
+
+    expect(response.status).toBe(204)
+    expect(response.headers.get('access-control-allow-origin')).toBe('https://fura.info')
   })
 
   it('permanently deletes the active profile and invalidates its session', async () => {
