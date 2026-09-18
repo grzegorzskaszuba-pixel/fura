@@ -179,6 +179,12 @@ describe('email verification API integration', () => {
     })
 
     expect(login.status).toBe(200)
+
+    const resendAfterVerification = await apiRequest('/api/auth/email-verification/resend', {
+      username: 'verification@example.com',
+    })
+
+    expect(resendAfterVerification.status).toBe(409)
   })
 
   it('promotes a pending registration only after the token is verified', async () => {

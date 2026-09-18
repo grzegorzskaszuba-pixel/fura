@@ -137,6 +137,14 @@ function setJson(response, statusCode, payload) {
   response.end(JSON.stringify(payload))
 }
 
+function logVerificationDelivery(recipient, delivery) {
+  // eslint-disable-next-line no-console
+  console.log('[auth-api] verification email accepted by Resend', {
+    recipient,
+    deliveryId: delivery?.id ?? null,
+  })
+}
+
 function setHtml(response, statusCode, html) {
   response.writeHead(statusCode, {
     'Content-Type': 'text/html; charset=utf-8',
@@ -2092,16 +2100,22 @@ async function handleAuthRequest(request, response) {
           `,
           [emailVerification.record.tokenHash, emailVerification.record.expiresAt, emailVerification.record.createdAt, pending.id],
         )
-        await sendEmailVerificationEmail(username, emailVerification.token)
-        setJson(response, 200, { ok: true })
+        const delivery = await sendEmailVerificationEmail(username, emailVerification.token)
+        logVerificationDelivery(username, delivery)
+        setJson(response, 200, { ok: true, sent: true })
         return
       }
 
       const result = await postgresQuery('SELECT id, username, email_verified_at FROM profiles WHERE username = $1 LIMIT 1', [username])
       const profile = result.rows[0]
 
-      if (!profile || profile.email_verified_at) {
-        setJson(response, 200, { ok: true })
+      if (!profile) {
+        setJson(response, 404, { message: 'Nie znaleziono oczekującej rejestracji dla tego adresu e-mail' })
+        return
+      }
+
+      if (profile.email_verified_at) {
+        setJson(response, 409, { message: 'To konto jest już zweryfikowane. Wróć do logowania.' })
         return
       }
 
@@ -2117,8 +2131,9 @@ async function handleAuthRequest(request, response) {
         )
       })
 
-      await sendEmailVerificationEmail(profile.username, emailVerification.token)
-      setJson(response, 200, { ok: true })
+      const delivery = await sendEmailVerificationEmail(profile.username, emailVerification.token)
+      logVerificationDelivery(profile.username, delivery)
+      setJson(response, 200, { ok: true, sent: true })
       return
     }
 
@@ -2132,15 +2147,21 @@ async function handleAuthRequest(request, response) {
       pending.createdAt = emailVerification.record.createdAt
       pending.usedAt = null
       await writeState(state)
-      await sendEmailVerificationEmail(username, emailVerification.token)
-      setJson(response, 200, { ok: true })
+      const delivery = await sendEmailVerificationEmail(username, emailVerification.token)
+      logVerificationDelivery(username, delivery)
+      setJson(response, 200, { ok: true, sent: true })
       return
     }
 
     const profile = state.profiles.find((entry) => entry.username === username)
 
-    if (!profile || profile.emailVerifiedAt) {
-      setJson(response, 200, { ok: true })
+    if (!profile) {
+      setJson(response, 404, { message: 'Nie znaleziono oczekującej rejestracji dla tego adresu e-mail' })
+      return
+    }
+
+    if (profile.emailVerifiedAt) {
+      setJson(response, 409, { message: 'To konto jest już zweryfikowane. Wróć do logowania.' })
       return
     }
 
@@ -2148,8 +2169,9 @@ async function handleAuthRequest(request, response) {
     state.emailVerificationTokens = (state.emailVerificationTokens ?? []).filter((entry) => entry.profileId !== profile.id)
     state.emailVerificationTokens.push(emailVerification.record)
     await writeState(state)
-    await sendEmailVerificationEmail(profile.username, emailVerification.token)
-    setJson(response, 200, { ok: true })
+    const delivery = await sendEmailVerificationEmail(profile.username, emailVerification.token)
+    logVerificationDelivery(profile.username, delivery)
+    setJson(response, 200, { ok: true, sent: true })
     return
   }
 
@@ -2184,7 +2206,8 @@ async function handleAuthRequest(request, response) {
           return
         }
 
-        await sendEmailVerificationEmail(profile.username, emailVerification.token)
+        const delivery = await sendEmailVerificationEmail(profile.username, emailVerification.token)
+        logVerificationDelivery(profile.username, delivery)
 
         try {
           await postgresTransaction(async (client) => {
@@ -2274,7 +2297,8 @@ async function handleAuthRequest(request, response) {
         return
       }
 
-      await sendEmailVerificationEmail(profile.username, emailVerification.token)
+      const delivery = await sendEmailVerificationEmail(profile.username, emailVerification.token)
+      logVerificationDelivery(profile.username, delivery)
       state.pendingEmailRegistrations = state.pendingEmailRegistrations ?? []
       state.pendingEmailRegistrations.push({
         id: storedProfile.id,
