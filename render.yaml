@@ -20,6 +20,10 @@ services:
         value: Lax
       - key: AUTH_COOKIE_SECURE
         value: "true"
+      - key: AUTH_EMAIL_VERIFICATION_ENABLED
+        value: "true"
+      - key: AUTH_WEB_BASE_URL
+        value: https://fura.info
       - key: AUTH_DATABASE_MAX_ATTEMPTS
         value: "8"
       - key: AUTH_DATABASE_RETRY_DELAY_MS

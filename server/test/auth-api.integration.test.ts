@@ -134,6 +134,7 @@ describe('auth API integration', () => {
         AUTH_API_HOST: '127.0.0.1',
         AUTH_API_ALLOWED_ORIGINS: 'https://fura.info/',
         AUTH_DB_FILE: dbFile,
+        AUTH_EMAIL_VERIFICATION_ENABLED: 'false',
         RESEND_TEST_TOKEN: '',
       },
       stdio: 'pipe',

@@ -117,6 +117,7 @@ describe('data API integration', () => {
         AUTH_API_HOST: '127.0.0.1',
         AUTH_API_ALLOWED_ORIGINS: '*',
         AUTH_DB_FILE: dbFile,
+        AUTH_EMAIL_VERIFICATION_ENABLED: 'false',
       },
       stdio: 'pipe',
     })

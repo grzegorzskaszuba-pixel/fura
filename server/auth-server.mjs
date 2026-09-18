@@ -12,13 +12,15 @@ import {
   registerProfile,
   resetPassword,
 } from './auth-core.mjs'
-import { sendTestEmail } from './email-service.mjs'
+import { sendEmailVerificationEmail, sendTestEmail } from './email-service.mjs'
+import { createEmailVerificationToken, hashEmailVerificationToken, isEmailVerificationTokenUsable } from './email-verification.mjs'
 import { StorageError, initializeStorage, isPostgresStorage, postgresQuery, postgresTransaction, readState, writeState } from './storage.mjs'
 
 const PORT = Number(process.env.AUTH_API_PORT ?? process.env.PORT ?? 8787)
 const HOST = process.env.AUTH_API_HOST ?? '0.0.0.0'
 const SESSION_COOKIE = 'fura_session'
 const RESEND_TEST_TOKEN = String(process.env.RESEND_TEST_TOKEN ?? '').trim()
+const EMAIL_VERIFICATION_ENABLED = String(process.env.AUTH_EMAIL_VERIFICATION_ENABLED ?? 'true').trim().toLowerCase() !== 'false'
 const COOKIE_SAME_SITE = String(process.env.AUTH_COOKIE_SAME_SITE ?? 'Lax')
 const COOKIE_SECURE =
   String(process.env.AUTH_COOKIE_SECURE ?? '').trim().toLowerCase() === 'true' ||
@@ -68,6 +70,8 @@ function isInputError(error) {
     normalized.includes('nie znaleziono ') ||
     normalized.includes('taki profil juz istnieje') ||
     normalized.includes('profil nie istnieje') ||
+    normalized.includes('potwierdz') ||
+    normalized.includes('weryfikacyj') ||
     normalized.includes('brak ') ||
     normalized.includes('musi miec co najmniej') ||
     normalized.includes('zalacznik') ||
@@ -1939,6 +1943,121 @@ async function handleAuthRequest(request, response) {
     return
   }
 
+  if (pathname === '/api/auth/verify-email' && method === 'POST') {
+    const payload = await readJsonBody(request)
+    const token = String(payload.token ?? '').trim()
+
+    if (!token) {
+      setJson(response, 400, { message: 'Brak tokenu weryfikacyjnego' })
+      return
+    }
+
+    const tokenHash = hashEmailVerificationToken(token)
+
+    if (isPostgresStorage()) {
+      const profileId = await postgresTransaction(async (client) => {
+        const tokenResult = await client.query(
+          `
+            UPDATE email_verification_tokens AS verification
+            SET used_at = NOW()
+            WHERE verification.token_hash = $1
+              AND verification.used_at IS NULL
+              AND verification.expires_at > NOW()
+              AND EXISTS (
+                SELECT 1
+                FROM profiles
+                WHERE profiles.id = verification.profile_id
+                  AND profiles.email_verified_at IS NULL
+              )
+            RETURNING verification.profile_id
+          `,
+          [tokenHash],
+        )
+
+        const matchedProfileId = tokenResult.rows[0]?.profile_id
+
+        if (!matchedProfileId) {
+          return null
+        }
+
+        await client.query('UPDATE profiles SET email_verified_at = NOW(), updated_at = NOW() WHERE id = $1', [matchedProfileId])
+        return matchedProfileId
+      })
+
+      if (!profileId) {
+        setJson(response, 400, { message: 'Link weryfikacyjny jest nieprawidłowy, zużyty lub wygasł' })
+        return
+      }
+
+      setJson(response, 200, { ok: true })
+      return
+    }
+
+    const state = await readState()
+    const verification = (state.emailVerificationTokens ?? []).find((entry) => entry.tokenHash === tokenHash)
+    const profile = verification ? state.profiles.find((entry) => entry.id === verification.profileId) : null
+
+    if (!profile || profile.emailVerifiedAt !== null || !isEmailVerificationTokenUsable(verification)) {
+      setJson(response, 400, { message: 'Link weryfikacyjny jest nieprawidłowy, zużyty lub wygasł' })
+      return
+    }
+
+    const verifiedAt = new Date().toISOString()
+    verification.usedAt = verifiedAt
+    profile.emailVerifiedAt = verifiedAt
+    profile.updatedAt = verifiedAt
+    await writeState(state)
+    setJson(response, 200, { ok: true })
+    return
+  }
+
+  if (pathname === '/api/auth/email-verification/resend' && method === 'POST') {
+    const payload = await readJsonBody(request)
+    const username = normalizeEmail(payload.username)
+
+    if (isPostgresStorage()) {
+      const result = await postgresQuery('SELECT id, username, email_verified_at FROM profiles WHERE username = $1 LIMIT 1', [username])
+      const profile = result.rows[0]
+
+      if (!profile || profile.email_verified_at) {
+        setJson(response, 200, { ok: true })
+        return
+      }
+
+      const emailVerification = createEmailVerificationToken(profile.id)
+      await postgresTransaction(async (client) => {
+        await client.query('DELETE FROM email_verification_tokens WHERE profile_id = $1', [profile.id])
+        await client.query(
+          `
+            INSERT INTO email_verification_tokens (id, profile_id, token_hash, expires_at, created_at)
+            VALUES ($1, $2, $3, $4, $5)
+          `,
+          [emailVerification.record.id, emailVerification.record.profileId, emailVerification.record.tokenHash, emailVerification.record.expiresAt, emailVerification.record.createdAt],
+        )
+      })
+
+      await sendEmailVerificationEmail(profile.username, emailVerification.token)
+      setJson(response, 200, { ok: true })
+      return
+    }
+
+    const state = await readState()
+    const profile = state.profiles.find((entry) => entry.username === username)
+
+    if (!profile || profile.emailVerifiedAt) {
+      setJson(response, 200, { ok: true })
+      return
+    }
+
+    const emailVerification = createEmailVerificationToken(profile.id)
+    state.emailVerificationTokens = (state.emailVerificationTokens ?? []).filter((entry) => entry.profileId !== profile.id)
+    state.emailVerificationTokens.push(emailVerification.record)
+    await writeState(state)
+    await sendEmailVerificationEmail(profile.username, emailVerification.token)
+    setJson(response, 200, { ok: true })
+    return
+  }
+
   if (pathname === '/api/auth/register' && method === 'POST') {
     const payload = await readJsonBody(request)
 
@@ -1959,17 +2078,28 @@ async function handleAuthRequest(request, response) {
       const localState = { profiles: [], credentials: [], vehicles: [], serviceEvents: [] }
       const profile = registerProfile(localState, payload)
       const credential = localState.credentials[0]
+      const emailVerification = EMAIL_VERIFICATION_ENABLED ? createEmailVerificationToken(profile.id) : null
 
       try {
         await postgresTransaction(async (client) => {
           await client.query(
-            'INSERT INTO profiles (id, username, display_name, created_at, updated_at) VALUES ($1, $2, $3, $4, $5)',
-            [profile.id, profile.username, profile.displayName, profile.createdAt, profile.updatedAt],
+            'INSERT INTO profiles (id, username, display_name, created_at, updated_at, email_verified_at) VALUES ($1, $2, $3, $4, $5, $6)',
+            [profile.id, profile.username, profile.displayName, profile.createdAt, profile.updatedAt, emailVerification ? null : profile.createdAt],
           )
           await client.query(
             'INSERT INTO credentials (profile_id, username, password_hash, password_salt, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6)',
             [credential.profileId, credential.username, credential.passwordHash, credential.passwordSalt, credential.createdAt, credential.updatedAt],
           )
+
+          if (emailVerification) {
+            await client.query(
+              `
+                INSERT INTO email_verification_tokens (id, profile_id, token_hash, expires_at, created_at)
+                VALUES ($1, $2, $3, $4, $5)
+              `,
+              [emailVerification.record.id, emailVerification.record.profileId, emailVerification.record.tokenHash, emailVerification.record.expiresAt, emailVerification.record.createdAt],
+            )
+          }
         })
       } catch (error) {
         if (typeof error === 'object' && error !== null && 'code' in error && error.code === '23505') {
@@ -1980,19 +2110,39 @@ async function handleAuthRequest(request, response) {
         throw error
       }
 
+      if (emailVerification) {
+        await sendEmailVerificationEmail(profile.username, emailVerification.token)
+        setJson(response, 200, { profile: sanitizeProfile(profile), verificationRequired: true })
+        return
+      }
+
       const sessionId = createSession(profile.id)
       setSessionCookie(response, sessionId)
-      setJson(response, 200, { profile, sessionId })
+      setJson(response, 200, { profile: sanitizeProfile(profile), sessionId, verificationRequired: false })
       return
     }
 
     const state = await readState()
     const profile = registerProfile(state, payload)
+    const emailVerification = EMAIL_VERIFICATION_ENABLED ? createEmailVerificationToken(profile.id) : null
+    profile.emailVerifiedAt = emailVerification ? null : profile.createdAt
+
+    if (emailVerification) {
+      state.emailVerificationTokens = (state.emailVerificationTokens ?? []).filter((entry) => entry.profileId !== profile.id)
+      state.emailVerificationTokens.push(emailVerification.record)
+    }
+
     await writeState(state)
+
+    if (emailVerification) {
+      await sendEmailVerificationEmail(profile.username, emailVerification.token)
+      setJson(response, 200, { profile: sanitizeProfile(profile), verificationRequired: true })
+      return
+    }
 
     const sessionId = createSession(profile.id)
     setSessionCookie(response, sessionId)
-    setJson(response, 200, { profile, sessionId })
+    setJson(response, 200, { profile: sanitizeProfile(profile), sessionId, verificationRequired: false })
     return
   }
 
@@ -2009,6 +2159,7 @@ async function handleAuthRequest(request, response) {
             p.display_name,
             p.created_at,
             p.updated_at,
+            p.email_verified_at,
             c.profile_id,
             c.password_hash,
             c.password_salt,
@@ -2035,14 +2186,15 @@ async function handleAuthRequest(request, response) {
             await postgresTransaction(async (client) => {
               await client.query(
                 `
-                  INSERT INTO profiles (id, username, display_name, created_at, updated_at)
-                  VALUES ($1, $2, $3, $4, $5)
+                  INSERT INTO profiles (id, username, display_name, created_at, updated_at, email_verified_at)
+                  VALUES ($1, $2, $3, $4, $5, $6)
                   ON CONFLICT (id) DO UPDATE
                   SET username = EXCLUDED.username,
                       display_name = EXCLUDED.display_name,
-                      updated_at = EXCLUDED.updated_at
+                      updated_at = EXCLUDED.updated_at,
+                      email_verified_at = COALESCE(profiles.email_verified_at, EXCLUDED.email_verified_at)
                 `,
-                [legacyProfile.id, legacyProfile.username, legacyProfile.displayName, legacyProfile.createdAt, legacyProfile.updatedAt],
+                [legacyProfile.id, legacyProfile.username, legacyProfile.displayName, legacyProfile.createdAt, legacyProfile.updatedAt, legacyProfile.createdAt],
               )
 
               await client.query(
@@ -2074,6 +2226,7 @@ async function handleAuthRequest(request, response) {
                   p.display_name,
                   p.created_at,
                   p.updated_at,
+                  p.email_verified_at,
                   c.profile_id,
                   c.password_hash,
                   c.password_salt,
@@ -2099,6 +2252,11 @@ async function handleAuthRequest(request, response) {
         return
       }
 
+      if (EMAIL_VERIFICATION_ENABLED && !row.email_verified_at) {
+        setJson(response, 403, { message: 'Potwierdź adres e-mail przed zalogowaniem' })
+        return
+      }
+
       const localState = {
         profiles: [
           {
@@ -2107,6 +2265,7 @@ async function handleAuthRequest(request, response) {
             displayName: row.display_name,
             createdAt: row.created_at,
             updatedAt: row.updated_at,
+            emailVerifiedAt: row.email_verified_at,
           },
         ],
         credentials: [
@@ -2142,6 +2301,13 @@ async function handleAuthRequest(request, response) {
     }
 
     const state = await readState()
+    const existingProfile = state.profiles.find((entry) => getLoginCandidates(payload.username).includes(entry.username))
+
+    if (EMAIL_VERIFICATION_ENABLED && existingProfile?.emailVerifiedAt === null) {
+      setJson(response, 403, { message: 'Potwierdź adres e-mail przed zalogowaniem' })
+      return
+    }
+
     const profile = loginProfile(state, payload)
     await writeState(state)
 

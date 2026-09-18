@@ -223,6 +223,7 @@ export function removeProfileData(state, profileId) {
   state.vehicles = (state.vehicles ?? []).filter((vehicle) => vehicle.profileId !== normalizedProfileId)
   state.serviceEvents = (state.serviceEvents ?? []).filter((event) => event.profileId !== normalizedProfileId)
   state.shareBrochures = (state.shareBrochures ?? []).filter((brochure) => brochure.profileId !== normalizedProfileId)
+  state.emailVerificationTokens = (state.emailVerificationTokens ?? []).filter((token) => token.profileId !== normalizedProfileId)
 
   return state.profiles.length !== profileCount
 }

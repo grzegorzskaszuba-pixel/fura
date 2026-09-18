@@ -135,6 +135,20 @@ Invoke-RestMethod -Method Post -Uri 'https://api.fura.info/api/email/test' -Head
 
 Endpoint wymaga jednoczesnie `RESEND_API_KEY` i `RESEND_TEST_TOKEN` w `fura-api`; bez tokenu zwraca `404` i pozostaje nieaktywny. Po potwierdzeniu wysylki usun `RESEND_TEST_TOKEN` z Render.
 
+### 4.7 Potwierdzenie adresu e-mail
+
+Scenariusz MVP:
+
+1. Rejestracja tworzy konto bez sesji i wysyla link wazny 24 godziny.
+2. Wejscie w link otwiera `/verify-email?token=...` i aktywuje konto.
+3. Logowanie przed aktywacja jest blokowane.
+4. Ekran oczekiwania pozwala wyslac link ponownie; poprzedni token zostaje uniewazniony.
+
+Pokrycie automatyczne:
+
+- `server/test/email-verification.unit.test.ts`
+- `server/test/email-verification-api.integration.test.ts`
+
 ## 5. Komendy uruchamiania testow
 
 Podstawowe komendy:

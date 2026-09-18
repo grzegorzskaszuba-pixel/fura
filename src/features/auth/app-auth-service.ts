@@ -3,7 +3,7 @@ import { accountRepository } from '@/data/repositories/account-repository'
 import { authCredentialRepository } from '@/data/repositories/auth-credential-repository'
 import { initializeDatabase } from '@/data/database/db'
 import { profileRepository } from '@/data/repositories/profile-repository'
-import type { AuthService } from '@/features/auth/auth-service'
+import type { AuthService, RegistrationProfile } from '@/features/auth/auth-service'
 import { createPasswordHash, verifyPassword } from '@/shared/lib/password'
 import type { LoginCredentials, RegisterCredentials } from '@/shared/types/domain'
 
@@ -60,7 +60,7 @@ export class AppAuthService implements AuthService {
     return setAndReturnProfile(credentials.profileId)
   }
 
-  async register(input: RegisterCredentials) {
+  async register(input: RegisterCredentials): Promise<RegistrationProfile> {
     await initializeDatabase()
     const normalizedUsername = input.username.trim().toLowerCase()
     const displayName = input.displayName?.trim() ?? ''
@@ -97,6 +97,16 @@ export class AppAuthService implements AuthService {
 
     await appStateRepository.setCurrentProfileId(profile.id)
     return profile
+  }
+
+  async verifyEmail(token: string) {
+    void token
+    throw new Error('Weryfikacja adresu e-mail jest dostępna tylko w trybie zdalnym.')
+  }
+
+  async resendVerificationEmail(username: string) {
+    void username
+    throw new Error('Ponowne wysłanie linku jest dostępne tylko w trybie zdalnym.')
   }
 
   async resetPassword(input: LoginCredentials) {

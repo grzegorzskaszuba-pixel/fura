@@ -8,6 +8,8 @@ import { serviceEventRepository } from '@/data/repositories/service-event-reposi
 import { vehicleRepository } from '@/data/repositories/vehicle-repository'
 import { authService } from '@/features/auth/auth-service-factory'
 import { AuthScreen } from '@/features/auth/auth-screen'
+import { EmailVerificationPending } from '@/features/auth/email-verification-pending'
+import { EmailVerificationScreen } from '@/features/auth/email-verification-screen'
 import { ProfileMenu } from '@/features/profile/profile-menu'
 import { ProfileSettingsModal } from '@/features/profile/profile-settings-modal'
 import { ServiceEventDetail } from '@/features/service-events/service-event-detail'
@@ -27,6 +29,14 @@ import { getTodayIsoDate } from '@/shared/lib/utils'
 import { sortEventsAsc, sortEventsDesc } from '@/shared/lib/format'
 import type { ServiceEvent, ServiceEventFormValues, ServiceTab, UserProfile, Vehicle, VehicleFormValues } from '@/shared/types/domain'
 
+function readEmailVerificationToken() {
+  if (typeof window === 'undefined') {
+    return null
+  }
+
+  return new URLSearchParams(window.location.search).get('token')
+}
+
 export default function App() {
   const [serviceTab, setServiceTab] = useState<ServiceTab>('history')
   const [activeVehicleId, setActiveVehicleId] = useState<string | null>(null)
@@ -45,6 +55,8 @@ export default function App() {
   const [isServiceEventsLoading, setIsServiceEventsLoading] = useState(false)
   const [isBootstrapping, setIsBootstrapping] = useState(true)
   const [appError, setAppError] = useState<string | null>(null)
+  const [pendingVerificationEmail, setPendingVerificationEmail] = useState<string | null>(null)
+  const [verificationToken, setVerificationToken] = useState<string | null>(readEmailVerificationToken)
   const [deleteVehicleDialogOpen, setDeleteVehicleDialogOpen] = useState(false)
   const [shareModalOpen, setShareModalOpen] = useState(false)
   const [shareId, setShareId] = useState<string | null>(null)
@@ -135,6 +147,14 @@ export default function App() {
 
     setActiveVehicleId(vehicles[0]?.id ?? null)
   }, [currentProfileId, persistedActiveVehicleId, vehicles])
+
+  function clearVerificationToken() {
+    setVerificationToken(null)
+
+    if (typeof window !== 'undefined') {
+      window.history.replaceState({}, document.title, window.location.pathname)
+    }
+  }
 
   useEffect(() => {
     setShareId(null)
@@ -259,7 +279,27 @@ export default function App() {
     }
   }, [shareExpiresAt])
 
+  if (verificationToken) {
+    return (
+      <EmailVerificationScreen
+        token={verificationToken}
+        onVerify={(token) => authService.verifyEmail(token)}
+        onBackToLogin={clearVerificationToken}
+      />
+    )
+  }
+
   if (!currentProfile) {
+    if (pendingVerificationEmail) {
+      return (
+        <EmailVerificationPending
+          email={pendingVerificationEmail}
+          onResend={() => authService.resendVerificationEmail(pendingVerificationEmail)}
+          onBackToLogin={() => setPendingVerificationEmail(null)}
+        />
+      )
+    }
+
     if (isBootstrapping) {
       return (
         <main className="mx-auto flex min-h-svh w-full max-w-6xl items-center justify-center px-4 py-6 sm:px-6 lg:px-8">
@@ -280,6 +320,12 @@ export default function App() {
         onRegister={async (credentials) => {
           setAppError(null)
           const profile = await authService.register(credentials)
+
+          if (profile.verificationRequired) {
+            setPendingVerificationEmail(credentials.username.trim().toLowerCase())
+            return
+          }
+
           setCurrentProfileId(profile.id)
           await loadProfileWorkspace(profile.id)
         }}

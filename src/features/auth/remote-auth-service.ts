@@ -1,4 +1,4 @@
-import type { AuthService } from '@/features/auth/auth-service'
+import type { AuthService, RegistrationProfile } from '@/features/auth/auth-service'
 import { appStateRepository } from '@/data/repositories/app-state-repository'
 import { appConfig } from '@/shared/config/app-config'
 import { httpRequest } from '@/shared/lib/http-client'
@@ -8,6 +8,7 @@ import type { LoginCredentials, RegisterCredentials, UserProfile } from '@/share
 interface AuthResponse {
   profile: UserProfile
   sessionId?: string
+  verificationRequired?: boolean
 }
 
 interface SessionResponse {
@@ -39,7 +40,7 @@ export class RemoteAuthService implements AuthService {
     return response.profile
   }
 
-  async register(input: RegisterCredentials) {
+  async register(input: RegisterCredentials): Promise<RegistrationProfile> {
     const response = await httpRequest<AuthResponse>(`${this.baseUrl}/register`, {
       method: 'POST',
       body: input,
@@ -47,9 +48,26 @@ export class RemoteAuthService implements AuthService {
 
     setSessionToken(response.sessionId)
 
-    await appStateRepository.setCurrentProfileId(response.profile.id)
+    await appStateRepository.setCurrentProfileId(response.sessionId ? response.profile.id : null)
 
-    return response.profile
+    return {
+      ...response.profile,
+      verificationRequired: response.verificationRequired === true,
+    }
+  }
+
+  async verifyEmail(token: string) {
+    await httpRequest<void>(`${this.baseUrl}/verify-email`, {
+      method: 'POST',
+      body: { token },
+    })
+  }
+
+  async resendVerificationEmail(username: string) {
+    await httpRequest<void>(`${this.baseUrl}/email-verification/resend`, {
+      method: 'POST',
+      body: { username },
+    })
   }
 
   async resetPassword(input: LoginCredentials) {

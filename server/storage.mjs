@@ -16,6 +16,7 @@ const emptyState = {
   vehicles: [],
   serviceEvents: [],
   shareBrochures: [],
+  emailVerificationTokens: [],
 }
 
 const storageMode = String(process.env.AUTH_STORAGE ?? '').trim().toLowerCase()
@@ -215,6 +216,7 @@ function normalizeState(candidate) {
     vehicles: Array.isArray(candidate.vehicles) ? candidate.vehicles : [],
     serviceEvents: Array.isArray(candidate.serviceEvents) ? candidate.serviceEvents : [],
     shareBrochures: Array.isArray(candidate.shareBrochures) ? candidate.shareBrochures : [],
+    emailVerificationTokens: Array.isArray(candidate.emailVerificationTokens) ? candidate.emailVerificationTokens : [],
   }
 
   return normalized
@@ -284,9 +286,26 @@ async function initializeNormalizedPostgresStorage() {
         username TEXT UNIQUE NOT NULL,
         display_name TEXT NOT NULL,
         created_at TIMESTAMPTZ NOT NULL,
-        updated_at TIMESTAMPTZ NOT NULL
+        updated_at TIMESTAMPTZ NOT NULL,
+        email_verified_at TIMESTAMPTZ
       )
     `)
+
+    const profileVerificationColumn = await pgPool.query(
+      `
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = current_schema()
+          AND table_name = 'profiles'
+          AND column_name = 'email_verified_at'
+        LIMIT 1
+      `,
+    )
+
+    if (profileVerificationColumn.rows.length === 0) {
+      await pgPool.query('ALTER TABLE profiles ADD COLUMN email_verified_at TIMESTAMPTZ')
+      await pgPool.query('UPDATE profiles SET email_verified_at = created_at WHERE email_verified_at IS NULL')
+    }
 
     await pgPool.query(`
       CREATE TABLE IF NOT EXISTS credentials (
@@ -373,6 +392,19 @@ async function initializeNormalizedPostgresStorage() {
     await pgPool.query('CREATE INDEX IF NOT EXISTS service_events_vehicle_updated_idx ON service_events (vehicle_id, updated_at DESC)')
     await pgPool.query('CREATE INDEX IF NOT EXISTS share_brochures_profile_expires_idx ON share_brochures (profile_id, expires_at DESC)')
     await pgPool.query('CREATE INDEX IF NOT EXISTS share_brochures_expires_idx ON share_brochures (expires_at)')
+
+    await pgPool.query(`
+      CREATE TABLE IF NOT EXISTS email_verification_tokens (
+        id UUID PRIMARY KEY,
+        profile_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+        token_hash TEXT UNIQUE NOT NULL,
+        expires_at TIMESTAMPTZ NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL,
+        used_at TIMESTAMPTZ
+      )
+    `)
+
+    await pgPool.query('CREATE INDEX IF NOT EXISTS email_verification_tokens_profile_idx ON email_verification_tokens (profile_id)')
   })
 
   await withPostgresRetry(async () => {
@@ -473,11 +505,11 @@ async function initializeNormalizedPostgresStorage() {
       for (const profile of legacyState.profiles) {
         await client.query(
           `
-            INSERT INTO profiles (id, username, display_name, created_at, updated_at)
-            VALUES ($1, $2, $3, $4, $5)
+            INSERT INTO profiles (id, username, display_name, created_at, updated_at, email_verified_at)
+            VALUES ($1, $2, $3, $4, $5, $6)
             ON CONFLICT (id) DO NOTHING
           `,
-          [profile.id, profile.username, profile.displayName, profile.createdAt, profile.updatedAt],
+          [profile.id, profile.username, profile.displayName, profile.createdAt, profile.updatedAt, profile.createdAt],
         )
       }
 
