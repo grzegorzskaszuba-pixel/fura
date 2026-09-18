@@ -272,6 +272,7 @@ Serwer wykonuje walidacje i normalizacje payloadow (np. pola tekstowe, liczby, l
 - AUTH_STORAGE
 - AUTH_DATABASE_URL / DATABASE_URL / INTERNAL_DATABASE_URL
 - parametry retry/pool DB (AUTH_DATABASE_*)
+- RESEND_API_KEY (tylko backend `fura-api`, wymagany przez test wysylki emaila)
 
 ## 13. Niezawodnosc i obsluga bledow
 

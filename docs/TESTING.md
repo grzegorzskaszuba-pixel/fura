@@ -117,6 +117,16 @@ Przyklad:
 
 - `tests/e2e/mobile.spec.ts`
 
+### 4.6 Smoke test wysylki emaila
+
+Jednorazowy test przez Resend uruchamiany w backendzie:
+
+```bash
+npm run email:test -- grzegorz.s.kaszuba@gmail.com
+```
+
+Komenda wymaga `RESEND_API_KEY` ustawionego w srodowisku `fura-api` i nie jest wywolywana przez frontend.
+
 ## 5. Komendy uruchamiania testow
 
 Podstawowe komendy:
