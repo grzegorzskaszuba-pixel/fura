@@ -94,6 +94,10 @@ describe('Auth screen regression', () => {
       />,
     )
 
+    expect(screen.getByText('Wysłaliśmy link potwierdzający na adres:')).toBeInTheDocument()
+    expect(screen.getByText('tester@example.com')).toBeInTheDocument()
+    expect(screen.getByText('Link jest ważny przez 24 godziny.')).toBeInTheDocument()
+
     act(() => {
       window.dispatchEvent(new StorageEvent('storage', { key: EMAIL_VERIFICATION_COMPLETED_STORAGE_KEY, newValue: '1' }))
     })

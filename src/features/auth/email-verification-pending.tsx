@@ -56,7 +56,9 @@ export function EmailVerificationPending({ email, onResend, onBackToLogin }: Ema
             <div className="space-y-3">
               <h1 className="text-2xl font-semibold tracking-tight text-zinc-950">Sprawdź swoją skrzynkę</h1>
               <p className="text-sm leading-6 text-zinc-600">
-                Wysłaliśmy link potwierdzający na adres <strong className="break-all text-zinc-950">{email}</strong>. Link jest ważny przez 24 godziny.
+                Wysłaliśmy link potwierdzający na adres:
+                <strong className="mt-1 block break-all text-zinc-950">{email}</strong>
+                <span className="mt-3 block">Link jest ważny przez 24 godziny.</span>
               </p>
             </div>
 
