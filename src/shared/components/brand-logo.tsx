@@ -21,11 +21,11 @@ export function BrandLogo() {
   }, [])
 
   return (
-    <div className="relative inline-flex h-14 w-[188px] items-center justify-end" aria-label="Branding FURA">
+    <div className="relative inline-flex h-14 w-[188px] items-center justify-start" aria-label="Branding FURA">
       <span
         aria-hidden="true"
         className={cn(
-          'absolute right-0 top-1/2 inline-flex h-14 -translate-y-1/2 items-center justify-center overflow-hidden rounded-full bg-white p-2 text-white shadow-sm ring-1 ring-zinc-200/80 transition-all duration-700 ease-in-out',
+          'absolute left-0 top-1/2 inline-flex h-14 -translate-y-1/2 items-center justify-center overflow-hidden rounded-full bg-white p-2 text-white shadow-sm ring-1 ring-zinc-200/80 transition-all duration-700 ease-in-out',
           logoPhase === 'pill' ? 'w-[152px] opacity-100' : 'w-14 opacity-100',
         )}
       >
