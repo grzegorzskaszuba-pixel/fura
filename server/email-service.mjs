@@ -4,8 +4,8 @@ import { getEmailVerificationUrl } from './email-verification.mjs'
 import { renderFuraEmailNote, renderFuraEmailTemplate, renderFuraEmailText } from './email-template.mjs'
 
 const EMAIL_FROM = 'FURA <no-reply@fura.info>'
-const TEST_SUBJECT = 'FURA test email'
-const VERIFICATION_SUBJECT = 'Confirm your FURA email address'
+const TEST_SUBJECT = 'Testowy e-mail FURA'
+const VERIFICATION_SUBJECT = 'Potwierdź adres e-mail w FURA'
 
 function getResendApiKey() {
   const apiKey = String(process.env.RESEND_API_KEY ?? '').trim()
@@ -44,8 +44,8 @@ async function sendEmail({ to, subject, html, text }) {
 }
 
 export function sendTestEmail(to) {
-  const title = 'FURA test email'
-  const intro = 'This is a test email from FURA.'
+  const title = 'Testowy e-mail FURA'
+  const intro = 'To jest testowa wiadomość e-mail od FURA.'
 
   return sendEmail({
     to,
@@ -64,10 +64,10 @@ export function sendTestEmail(to) {
 
 export function sendEmailVerificationEmail(to, token) {
   const verificationUrl = getEmailVerificationUrl(token)
-  const title = 'Confirm your email address'
-  const intro = 'Welcome to FURA. Confirm your email address to activate your account.'
+  const title = 'Potwierdź adres e-mail'
+  const intro = 'Witamy w FURA. Potwierdź adres e-mail, aby aktywować konto.'
   const action = {
-    label: 'Confirm email address',
+    label: 'Potwierdź adres e-mail',
     url: verificationUrl,
   }
 
@@ -75,16 +75,16 @@ export function sendEmailVerificationEmail(to, token) {
     to,
     subject: VERIFICATION_SUBJECT,
     html: renderFuraEmailTemplate({
-      preheader: 'Confirm your FURA email address',
+      preheader: 'Potwierdź adres e-mail w FURA',
       title,
       intro,
-      contentHtml: renderFuraEmailNote('This link expires in 24 hours.'),
+      contentHtml: renderFuraEmailNote('Link jest ważny przez 24 godziny.'),
       action,
     }),
     text: renderFuraEmailText({
       title,
       intro,
-      bodyText: 'This link expires in 24 hours.',
+      bodyText: 'Link jest ważny przez 24 godziny.',
       action,
     }),
   })

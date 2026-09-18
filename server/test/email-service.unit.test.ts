@@ -57,12 +57,12 @@ describe('email service', () => {
     expect(emailPayload).toMatchObject({
       from: 'FURA <no-reply@fura.info>',
       to: 'grzegorz.s.kaszuba@gmail.com',
-      subject: 'FURA test email',
-      text: 'FURA\n\nFURA test email\n\nThis is a test email from FURA.\n\nFURA\nSimple service log for every car.',
+      subject: 'Testowy e-mail FURA',
+      text: 'FURA\n\nTestowy e-mail FURA\n\nTo jest testowa wiadomość e-mail od FURA.\n\nFURA\nProsty dziennik serwisowy dla każdego auta.',
     })
-    expect(emailPayload.html).toContain('FURA test email')
-    expect(emailPayload.html).toContain('This is a test email from FURA.')
-    expect(emailPayload.html).toContain('Simple service log for every car.')
+    expect(emailPayload.html).toContain('Testowy e-mail FURA')
+    expect(emailPayload.html).toContain('To jest testowa wiadomość e-mail od FURA.')
+    expect(emailPayload.html).toContain('Prosty dziennik serwisowy dla każdego auta.')
   })
 
   it('converts a Resend provider error into a readable error', async () => {
@@ -84,13 +84,12 @@ describe('email service', () => {
     expect(emailPayload).toMatchObject({
       from: 'FURA <no-reply@fura.info>',
       to: 'driver@example.com',
-      subject: 'Confirm your FURA email address',
-      text: 'FURA\n\nConfirm your email address\n\nWelcome to FURA. Confirm your email address to activate your account.\n\nThis link expires in 24 hours.\n\nConfirm email address: https://fura.info/verify-email?token=verification-token\n\nFURA\nSimple service log for every car.',
+      subject: 'Potwierdź adres e-mail w FURA',
+      text: 'FURA\n\nPotwierdź adres e-mail\n\nWitamy w FURA. Potwierdź adres e-mail, aby aktywować konto.\n\nLink jest ważny przez 24 godziny.\n\nPotwierdź adres e-mail: https://fura.info/verify-email?token=verification-token\n\nFURA\nProsty dziennik serwisowy dla każdego auta.',
     })
-    expect(emailPayload.html).toContain('Confirm your email address')
-    expect(emailPayload.html).toContain('Confirm email address')
+    expect(emailPayload.html).toContain('Potwierdź adres e-mail')
     expect(emailPayload.html).toContain('https://fura.info/verify-email?token=verification-token')
-    expect(emailPayload.html).toContain('Simple service log for every car.')
+    expect(emailPayload.html).toContain('Prosty dziennik serwisowy dla każdego auta.')
     expect(emailPayload.html).toContain('#f97316')
   })
 })

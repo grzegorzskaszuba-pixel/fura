@@ -3,7 +3,7 @@ const BRAND_BLACK = '#09090b'
 const BORDER = '#e4e4e7'
 const MUTED_TEXT = '#52525b'
 const PAGE_BACKGROUND = '#f6f7f8'
-const FOOTER_TEXT = 'Simple service log for every car.'
+const FOOTER_TEXT = 'Prosty dziennik serwisowy dla każdego auta.'
 
 function escapeHtml(value) {
   return String(value ?? '')
@@ -35,7 +35,7 @@ export function renderFuraEmailTemplate({ preheader = '', title, intro, contentH
     : ''
 
   return `<!doctype html>
-<html lang="en">
+<html lang="pl">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -51,7 +51,7 @@ export function renderFuraEmailTemplate({ preheader = '', title, intro, contentH
               <td style="padding:32px 32px 28px;">
                 <table role="presentation" border="0" cellpadding="0" cellspacing="0">
                   <tr>
-                    <td style="padding:7px 18px;border:1px solid ${BORDER};border-radius:999px;background:#ffffff;">
+                    <td style="padding:8px;border:1px solid ${BORDER};border-radius:999px;background:#ffffff;">
                       <span style="display:inline-block;padding:8px 20px;border-radius:999px;background:${BRAND_BLACK};color:#ffffff;font-family:Arial,Helvetica,sans-serif;font-size:24px;font-weight:700;letter-spacing:-1px;line-height:1;">FURA</span>
                     </td>
                   </tr>
