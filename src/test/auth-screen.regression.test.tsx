@@ -1,8 +1,11 @@
 import { act, render, screen, waitFor } from '@testing-library/react'
+import { StrictMode } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import App from '@/app/App'
 import { appAuthService } from '@/features/auth/app-auth-service'
+import { EMAIL_VERIFICATION_COMPLETED_STORAGE_KEY } from '@/features/auth/email-verification-events'
+import { EmailVerificationPending } from '@/features/auth/email-verification-pending'
 import { AuthScreen } from '@/features/auth/auth-screen'
 import { EmailVerificationScreen } from '@/features/auth/email-verification-screen'
 
@@ -62,5 +65,39 @@ describe('Auth screen regression', () => {
     })
 
     expect(screen.queryByText('Potwierdzanie adresu e-mail...')).not.toBeInTheDocument()
+  })
+
+  it('settles the verification result when StrictMode replays the effect', async () => {
+    render(
+      <StrictMode>
+        <EmailVerificationScreen
+          token="invalid-token"
+          onVerify={async () => {
+            throw new Error('Link weryfikacyjny jest nieprawidłowy, zużyty lub wygasł')
+          }}
+          onBackToLogin={() => undefined}
+        />
+      </StrictMode>,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText('Link weryfikacyjny jest nieprawidłowy, zużyty lub wygasł')).toBeInTheDocument()
+    })
+  })
+
+  it('updates the pending screen when verification completes in another tab', async () => {
+    render(
+      <EmailVerificationPending
+        email="tester@example.com"
+        onResend={async () => undefined}
+        onBackToLogin={() => undefined}
+      />,
+    )
+
+    act(() => {
+      window.dispatchEvent(new StorageEvent('storage', { key: EMAIL_VERIFICATION_COMPLETED_STORAGE_KEY, newValue: '1' }))
+    })
+
+    expect(await screen.findByText('Adres e-mail został potwierdzony w innej karcie. Wróć do logowania.')).toBeInTheDocument()
   })
 })

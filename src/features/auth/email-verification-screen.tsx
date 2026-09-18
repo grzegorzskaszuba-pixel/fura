@@ -1,6 +1,7 @@
 import { CheckCircle2, LoaderCircle, TriangleAlert } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 
+import { notifyEmailVerificationCompleted } from '@/features/auth/email-verification-events'
 import { BrandLogo } from '@/shared/components/brand-logo'
 import { Button } from '@/shared/components/ui/button'
 import { Card, CardContent } from '@/shared/components/ui/card'
@@ -22,24 +23,16 @@ export function EmailVerificationScreen({ token, onVerify, onBackToLogin }: Emai
     }
 
     verificationStarted.current = true
-    let active = true
 
     void onVerify(token)
       .then(() => {
-        if (active) {
-          setStatus('success')
-        }
+        notifyEmailVerificationCompleted()
+        setStatus('success')
       })
       .catch((verificationError) => {
-        if (active) {
-          setError(verificationError instanceof Error ? verificationError.message : 'Nie udało się potwierdzić adresu e-mail.')
-          setStatus('error')
-        }
+        setError(verificationError instanceof Error ? verificationError.message : 'Nie udało się potwierdzić adresu e-mail.')
+        setStatus('error')
       })
-
-    return () => {
-      active = false
-    }
   }, [onVerify, token])
 
   return (

@@ -1,6 +1,7 @@
 import { Check, LoaderCircle, MailCheck, RefreshCw } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
+import { EMAIL_VERIFICATION_COMPLETED_STORAGE_KEY } from '@/features/auth/email-verification-events'
 import { BrandLogo } from '@/shared/components/brand-logo'
 import { Button } from '@/shared/components/ui/button'
 import { Card, CardContent } from '@/shared/components/ui/card'
@@ -15,6 +16,18 @@ export function EmailVerificationPending({ email, onResend, onBackToLogin }: Ema
   const [isResending, setIsResending] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    function handleStorage(event: StorageEvent) {
+      if (event.key === EMAIL_VERIFICATION_COMPLETED_STORAGE_KEY) {
+        setMessage('Adres e-mail został potwierdzony w innej karcie. Wróć do logowania.')
+        setError(null)
+      }
+    }
+
+    window.addEventListener('storage', handleStorage)
+    return () => window.removeEventListener('storage', handleStorage)
+  }, [])
 
   async function handleResend() {
     setIsResending(true)
