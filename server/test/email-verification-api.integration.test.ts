@@ -79,6 +79,7 @@ describe('email verification API integration', () => {
     const pendingProfileId = 'pending-profile'
     const pendingToken = 'pending-token'
     const pendingSalt = 'pending-salt'
+    const tokenExpiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString()
     const port = await findFreePort()
     baseUrl = `http://127.0.0.1:${port}`
 
@@ -113,7 +114,7 @@ describe('email verification API integration', () => {
             id: 'verification-token-record',
             profileId,
             tokenHash: hashEmailVerificationToken(token),
-            expiresAt: '2026-09-19T00:00:00.000Z',
+            expiresAt: tokenExpiresAt,
             createdAt: '2026-09-18T00:00:00.000Z',
             usedAt: null,
           },
@@ -126,7 +127,7 @@ describe('email verification API integration', () => {
             passwordHash: crypto.scryptSync('secret123', pendingSalt, 64).toString('hex'),
             passwordSalt: pendingSalt,
             tokenHash: hashEmailVerificationToken(pendingToken),
-            expiresAt: '2026-09-19T00:00:00.000Z',
+            expiresAt: tokenExpiresAt,
             createdAt: '2026-09-18T00:00:00.000Z',
             usedAt: null,
           },
