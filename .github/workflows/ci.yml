@@ -16,6 +16,9 @@ on:
 jobs:
   changes:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
     outputs:
       app_changed: ${{ steps.filter.outputs.app_changed }}
     steps:
