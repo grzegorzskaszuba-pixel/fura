@@ -16,14 +16,17 @@ on:
 jobs:
   changes:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
     outputs:
       app_changed: ${{ steps.filter.outputs.app_changed }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Detect changed paths
         id: filter
-        uses: dorny/paths-filter@v3
+        uses: dorny/paths-filter@v4
         with:
           filters: |
             app_changed:
@@ -41,7 +44,7 @@ jobs:
     needs: changes
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -66,7 +69,7 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ needs.changes.outputs.app_changed == 'true' || (github.event_name == 'workflow_dispatch' && github.event.inputs.run_e2e == 'true') }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup Node
         uses: actions/setup-node@v4
