@@ -45,5 +45,6 @@ Treat planned items as direction, not implemented functionality.
 - Mobile-first web experience.
 - Reuse established components and patterns.
 - Prefer incremental features with clear user value.
-- Human approval remains between refinement and implementation.
+- The owner controls normal work through Project status plus explicit agent assignment.
+- `To Do` remains passive for normal items; incidents are the immediate-start exception.
 - Agents may propose but must not silently expand product scope.
