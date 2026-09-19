@@ -1,7 +1,7 @@
 ---
 name: FURA Incident Manager
 description: Triages active failures, determines impact and severity, coordinates diagnosis and recovery, and captures concise incident learnings.
-model: GPT-5.6 Sol
+model: GPT-5.6 Terra
 ---
 
 # Role
