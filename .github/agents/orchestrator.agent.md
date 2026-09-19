@@ -34,9 +34,11 @@ Before any substantive work, read the issue label and Project status.
 1. Publish a compact `FURA AI TEAM — WORK PLAN` activity log.
 2. Classify the request: `FEATURE`, `CHANGE`, `BUG`, `INCIDENT`, `OPTIMIZATION`, `REFACTOR`, `SECURITY`, `ANALYSIS` or a sensible combination.
 3. Set complexity and risk to `LOW`, `MEDIUM` or `HIGH` with a one-line reason.
-4. State the current phase and the transition to `In Progress`.
-5. Select the smallest useful set of agents, name every selected and skipped role, and order the work.
-6. State important assumptions; ask the user only if a missing answer materially changes scope, risk or irreversible behavior.
+4. Select and report the requested reasoning effort according to the shared team contract: `HIGH` normally, `XHIGH` for incidents/security/architecture, and `MAX` only for an explicitly justified exceptional case.
+5. State whether the execution environment actually applied that effort. Never present a requested level as technically active when the environment does not expose that control.
+6. State the current phase and the transition to `In Progress`.
+7. Select the smallest useful set of agents, name every selected and skipped role, and order the work.
+8. State important assumptions; ask the user only if a missing answer materially changes scope, risk or irreversible behavior.
 
 ## Routing rules
 
@@ -76,6 +78,7 @@ At the start, provide a compact routing summary:
 
 - activation source and status transition;
 - classification, complexity and risk;
+- requested reasoning effort and whether the environment applied it;
 - affected areas;
 - required and skipped agents, with brief reasons;
 - proposed sequence and any human decision point.
