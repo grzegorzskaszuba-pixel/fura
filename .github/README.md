@@ -28,19 +28,33 @@ FURA repository
 
 After the commit is merged, GitHub displays these choices under **Issues → New issue**. Each form automatically adds its matching existing label.
 
-## Suggested Project routing
+## Project routing
 
 Issue Forms assign labels, but this package intentionally does not hard-code a GitHub Project number or Project field values.
 
-Recommended routing:
+Use these Project statuses:
 
-| Label | Initial Project status | First route after activation |
-|---|---|---|
-| `enhancement` | Backlog | Orchestrator → Product Manager when moved to Ready for Refinement |
-| `problem` | Backlog | Orchestrator → Product Manager/QA when moved to Ready for Refinement |
-| `enabler` | Backlog | Orchestrator → Solution Architect when moved to Ready for Refinement |
-| `documentation` | Backlog | Orchestrator → Technical Writer when moved to Ready for Refinement |
-| `bug` | Ready for Triage | Orchestrator → QA → relevant Developer |
-| `incident` | Incident Reported | Orchestrator → Incident Manager immediately |
+```text
+To Do
+Triage
+Ready for Development
+In Progress
+Ready for QA
+Monitoring
+Done
+```
 
-Project auto-add and status routing can be configured in the next implementation step after confirming the Project owner and number.
+Routing rules:
+
+| Label | Waiting status | Start condition | First route |
+|---|---|---|---|
+| `enhancement` | To Do | Move to Ready for Development and assign the FURA Orchestrator | Orchestrator → Product Manager as needed → implementation roles |
+| `problem` | Triage | Assign the FURA Orchestrator | Orchestrator → Product Manager and/or QA |
+| `bug` | Triage | Assign the FURA Orchestrator | Orchestrator → QA → relevant Developer |
+| `enabler` | To Do | Move to Ready for Development and assign the FURA Orchestrator | Orchestrator → Solution Architect → relevant Developer |
+| `documentation` | To Do | Move to Ready for Development and assign the FURA Orchestrator | Orchestrator → Technical Writer |
+| `incident` | To Do | Immediate activation when added to the Project | Orchestrator → Incident Manager immediately |
+
+`To Do` is the passive backlog for every non-incident item. Moving an item to `Triage` or `Ready for Development` does not start work by itself: assigning the FURA Orchestrator is the explicit start signal. The exception is an `incident`, which must be dispatched immediately.
+
+As soon as any agent starts processing an item, its Project status must change to `In Progress`. Project automation for immediate incident dispatch still requires a dispatcher or GitHub workflow; these instructions define the expected behavior but do not create that trigger by themselves.

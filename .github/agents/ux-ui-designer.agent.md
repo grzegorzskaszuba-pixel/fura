@@ -47,4 +47,4 @@ Use the lightest useful artifact:
 5. Reused versus new components.
 6. UX acceptance checks for QA.
 
-For trivial changes, a short annotated recommendation is enough. Finish with `READY FOR IMPLEMENTATION`, `CHANGES REQUIRED` or `BLOCKED`.
+For trivial changes, a short annotated recommendation is enough. Finish with `READY FOR DEVELOPMENT`, `CHANGES REQUIRED` or `BLOCKED`.

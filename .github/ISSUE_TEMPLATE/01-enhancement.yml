@@ -7,7 +7,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Describe the idea at a high level. Detailed refinement will happen after the item is moved to **Ready for Refinement**.
+        Describe the idea at a high level. It can remain in **To Do** as backlog. Move it to **Ready for Development** and assign the FURA Orchestrator only when you want work to start.
 
   - type: textarea
     id: idea
