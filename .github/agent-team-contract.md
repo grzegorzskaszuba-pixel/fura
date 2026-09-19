@@ -25,6 +25,20 @@ All FURA agents follow this contract unless the user explicitly gives a differen
 - Not every role participates in every task.
 - Documentation is updated only when behavior, operations, interfaces or important decisions change.
 
+## Reasoning effort policy
+
+Use this policy whenever the current GitHub Copilot or VS Code surface exposes configurable reasoning effort:
+
+- `HIGH` is the standard effort for normal product, development, QA, documentation and performance work.
+- `EXTRA HIGH` / `XHIGH` is required for incident management, security work and solution architecture.
+- `MAX` is reserved for exceptionally difficult cases. Use it only when complexity and risk are high and at least one of these applies:
+  - two focused diagnosis or repair cycles failed;
+  - evidence is contradictory or the root cause spans several layers;
+  - the decision affects production availability, sensitive data or a difficult-to-reverse migration;
+  - the Orchestrator can state another concrete reason why `XHIGH` is insufficient.
+- The Orchestrator must state the requested effort and the reason for every `MAX` escalation.
+- Reasoning effort is an execution setting, not a claim. If the current environment does not expose effort control, agents must not claim it was applied. Record the requested level and continue with the configured model, or ask the owner to relaunch only when the higher effort is materially necessary.
+
 ## Shared statuses
 
 Use these when a shared work item exists:
