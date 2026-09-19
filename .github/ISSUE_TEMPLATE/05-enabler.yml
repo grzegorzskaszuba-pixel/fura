@@ -4,6 +4,11 @@ title: "[Enabler] "
 labels:
   - enabler
 body:
+  - type: markdown
+    attributes:
+      value: |
+        Keep this item in **To Do** as backlog. Move it to **Ready for Development** and assign the FURA Orchestrator only when you want work to start.
+
   - type: textarea
     id: need
     attributes:
