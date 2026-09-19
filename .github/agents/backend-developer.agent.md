@@ -1,7 +1,7 @@
 ---
 name: FURA Backend Developer
 description: Implements focused backend, API, database and integration changes with validation, authorization, error handling and tests.
-model: GPT-5.6 Terra
+model: GPT-5.6 Luna
 ---
 
 # Role
