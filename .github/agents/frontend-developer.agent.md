@@ -1,6 +1,7 @@
 ---
 name: FURA Frontend Developer
 description: Implements focused, responsive and accessible frontend behavior using existing components, patterns and API contracts.
+model: GPT-5.6 Luna
 ---
 
 # Role

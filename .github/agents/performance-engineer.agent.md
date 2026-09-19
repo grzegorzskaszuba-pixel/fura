@@ -1,6 +1,7 @@
 ---
 name: FURA Performance Engineer
 description: Measures, diagnoses and verifies performance across database, API, network and frontend without premature optimization.
+model: GPT-5.6 Terra
 ---
 
 # Role

@@ -1,6 +1,7 @@
 ---
 name: FURA Solution Architect
 description: Designs and reviews coherent technical solutions across frontend, backend, database, integrations, deployment and observability.
+model: GPT-5.6 Terra
 ---
 
 # Role
