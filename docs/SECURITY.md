@@ -39,6 +39,8 @@ Endpointy auth:
 - `POST /api/auth/logout`
 - `POST /api/auth/change-password`
 - `POST /api/auth/reset-password`
+- `POST /api/auth/password-reset/request`
+- `POST /api/auth/password-reset/confirm`
 
 Przeplyw:
 
@@ -58,6 +60,14 @@ Aktualna implementacja:
 - hashowanie hasel po stronie backendu z wykorzystaniem `scrypt`
 - losowa sol per haslo
 - porownanie hashy przez `timingSafeEqual`
+
+Odzyskiwanie hasla przez e-mail:
+
+- token jest losowy, przechowywany w bazie wylacznie jako hash SHA-256
+- token wygasa po 30 minutach i po uzyciu jest oznaczany jako niewazny
+- nowa prosba uniewaznia poprzedni token dla profilu
+- po skutecznej zmianie hasla uniewazniane sa aktywne sesje profilu
+- wysylane jest powiadomienie: `Haslo do konta FURA zostalo zmienione. Jesli to nie Ty, skontaktuj sie z nami.`
 
 Wnioski:
 

@@ -1,11 +1,14 @@
 import { Resend } from 'resend'
 
 import { getEmailVerificationUrl } from './email-verification.mjs'
+import { getPasswordResetUrl } from './password-reset.mjs'
 import { renderFuraEmailNote, renderFuraEmailTemplate, renderFuraEmailText } from './email-template.mjs'
 
 const EMAIL_FROM = 'FURA <no-reply@fura.info>'
 const TEST_SUBJECT = 'Testowy e-mail FURA'
 const VERIFICATION_SUBJECT = 'Potwierdź adres e-mail w FURA'
+const PASSWORD_RESET_SUBJECT = 'Reset hasła w FURA'
+const PASSWORD_CHANGED_SUBJECT = 'Hasło do konta FURA zostało zmienione'
 
 function getResendApiKey() {
   const apiKey = String(process.env.RESEND_API_KEY ?? '').trim()
@@ -86,6 +89,53 @@ export function sendEmailVerificationEmail(to, token) {
       intro,
       bodyText: 'Link jest ważny przez 24 godziny.',
       action,
+    }),
+  })
+}
+
+export function sendPasswordResetEmail(to, token) {
+  const resetUrl = getPasswordResetUrl(token)
+  const title = 'Ustaw nowe hasło'
+  const intro = 'Otrzymaliśmy prośbę o ustawienie nowego hasła do Twojego konta FURA.'
+  const action = {
+    label: 'Ustaw nowe hasło',
+    url: resetUrl,
+  }
+
+  return sendEmail({
+    to,
+    subject: PASSWORD_RESET_SUBJECT,
+    html: renderFuraEmailTemplate({
+      preheader: 'Ustaw nowe hasło do konta FURA',
+      title,
+      intro,
+      contentHtml: renderFuraEmailNote('Link jest ważny przez 30 minut i może zostać użyty tylko raz.'),
+      action,
+    }),
+    text: renderFuraEmailText({
+      title,
+      intro,
+      bodyText: 'Link jest ważny przez 30 minut i może zostać użyty tylko raz.',
+      action,
+    }),
+  })
+}
+
+export function sendPasswordChangedEmail(to) {
+  const title = 'Hasło zostało zmienione'
+  const intro = 'Hasło do konta FURA zostało zmienione. Jeśli to nie Ty, skontaktuj się z nami.'
+
+  return sendEmail({
+    to,
+    subject: PASSWORD_CHANGED_SUBJECT,
+    html: renderFuraEmailTemplate({
+      preheader: 'Hasło do konta FURA zostało zmienione',
+      title,
+      intro,
+    }),
+    text: renderFuraEmailText({
+      title,
+      intro,
     }),
   })
 }

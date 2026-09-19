@@ -1,4 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
+import { LoaderCircle, Mail } from 'lucide-react'
 import { useEffect, useState, type MouseEvent } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
@@ -35,6 +36,8 @@ interface ProfileSettingsModalProps {
   currentProfile: UserProfile
   onUpdateProfile: (values: { displayName: string }) => Promise<void>
   onChangePassword: (values: { currentPassword: string; newPassword: string }) => Promise<void>
+  onRequestPasswordReset: (email: string) => Promise<void>
+  allowPasswordReset?: boolean
   onDeleteAccount: () => Promise<void>
   onExportAccountReport?: () => Promise<void>
 }
@@ -45,14 +48,19 @@ export function ProfileSettingsModal({
   currentProfile,
   onUpdateProfile,
   onChangePassword,
+  onRequestPasswordReset,
+  allowPasswordReset = false,
   onDeleteAccount,
   onExportAccountReport,
 }: ProfileSettingsModalProps) {
   const [profileError, setProfileError] = useState<string | null>(null)
   const [passwordError, setPasswordError] = useState<string | null>(null)
+  const [passwordResetMessage, setPasswordResetMessage] = useState<string | null>(null)
+  const [passwordResetError, setPasswordResetError] = useState<string | null>(null)
   const [deleteError, setDeleteError] = useState<string | null>(null)
   const [isProfileSubmitting, setIsProfileSubmitting] = useState(false)
   const [isPasswordSubmitting, setIsPasswordSubmitting] = useState(false)
+  const [isPasswordResetSubmitting, setIsPasswordResetSubmitting] = useState(false)
   const [isDeleteSubmitting, setIsDeleteSubmitting] = useState(false)
   const [isExportSubmitting, setIsExportSubmitting] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
@@ -107,6 +115,21 @@ export function ProfileSettingsModal({
     }
   }
 
+  async function handlePasswordResetRequest() {
+    setPasswordResetMessage(null)
+    setPasswordResetError(null)
+    setIsPasswordResetSubmitting(true)
+
+    try {
+      await onRequestPasswordReset(currentProfile.username)
+      setPasswordResetMessage('Jeśli konto jest przypisane do tego adresu, link resetujący został wysłany. Link jest ważny przez 30 minut.')
+    } catch (requestError) {
+      setPasswordResetError(requestError instanceof Error ? requestError.message : 'Nie udało się wysłać linku resetującego.')
+    } finally {
+      setIsPasswordResetSubmitting(false)
+    }
+  }
+
   async function handleDeleteAccount(event: MouseEvent<HTMLButtonElement>) {
     event.preventDefault()
     setDeleteError(null)
@@ -143,6 +166,8 @@ export function ProfileSettingsModal({
         if (!nextOpen) {
           setProfileError(null)
           setPasswordError(null)
+          setPasswordResetMessage(null)
+          setPasswordResetError(null)
           setDeleteError(null)
           setDeleteDialogOpen(false)
           passwordForm.reset()
@@ -217,6 +242,21 @@ export function ProfileSettingsModal({
             </Button>
           </div>
         </form>
+
+        {allowPasswordReset ? (
+          <section className="space-y-3 rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
+            <div>
+              <h3 className="text-sm font-semibold uppercase tracking-[0.08em] text-zinc-500">Reset hasła przez e-mail</h3>
+              <p className="mt-2 text-sm leading-6 text-zinc-600">Wyślemy jednorazowy link na adres {currentProfile.username}. Link będzie ważny przez 30 minut.</p>
+            </div>
+            {passwordResetMessage ? <p className="text-sm text-emerald-700">{passwordResetMessage}</p> : null}
+            {passwordResetError ? <p className="text-sm text-red-600">{passwordResetError}</p> : null}
+            <Button type="button" variant="outline" disabled={isPasswordResetSubmitting} onClick={() => void handlePasswordResetRequest()}>
+              {isPasswordResetSubmitting ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
+              {isPasswordResetSubmitting ? 'Wysyłanie...' : 'Wyślij link resetujący'}
+            </Button>
+          </section>
+        ) : null}
 
         <div className="h-px bg-zinc-200" />
 

@@ -10,6 +10,7 @@ import { authService } from '@/features/auth/auth-service-factory'
 import { AuthScreen } from '@/features/auth/auth-screen'
 import { EmailVerificationPending } from '@/features/auth/email-verification-pending'
 import { EmailVerificationScreen } from '@/features/auth/email-verification-screen'
+import { PasswordResetScreen } from '@/features/auth/password-reset-screen'
 import { ProfileMenu } from '@/features/profile/profile-menu'
 import { ProfileSettingsModal } from '@/features/profile/profile-settings-modal'
 import { ServiceEventDetail } from '@/features/service-events/service-event-detail'
@@ -25,12 +26,21 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Button } from '@/shared/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/shared/components/ui/dropdown-menu'
 import { getDefaultVehicleImage } from '@/shared/constants/vehicle-images'
+import { appConfig } from '@/shared/config/app-config'
 import { getTodayIsoDate } from '@/shared/lib/utils'
 import { sortEventsAsc, sortEventsDesc } from '@/shared/lib/format'
 import type { ServiceEvent, ServiceEventFormValues, ServiceTab, UserProfile, Vehicle, VehicleFormValues } from '@/shared/types/domain'
 
 function readEmailVerificationToken() {
-  if (typeof window === 'undefined') {
+  if (typeof window === 'undefined' || window.location.pathname !== '/verify-email') {
+    return null
+  }
+
+  return new URLSearchParams(window.location.search).get('token')
+}
+
+function readPasswordResetToken() {
+  if (typeof window === 'undefined' || window.location.pathname !== '/reset-password') {
     return null
   }
 
@@ -57,6 +67,7 @@ export default function App() {
   const [appError, setAppError] = useState<string | null>(null)
   const [pendingVerificationEmail, setPendingVerificationEmail] = useState<string | null>(null)
   const [verificationToken, setVerificationToken] = useState<string | null>(readEmailVerificationToken)
+  const [passwordResetToken, setPasswordResetToken] = useState<string | null>(readPasswordResetToken)
   const [deleteVehicleDialogOpen, setDeleteVehicleDialogOpen] = useState(false)
   const [shareModalOpen, setShareModalOpen] = useState(false)
   const [shareId, setShareId] = useState<string | null>(null)
@@ -150,6 +161,14 @@ export default function App() {
 
   function clearVerificationToken() {
     setVerificationToken(null)
+
+    if (typeof window !== 'undefined') {
+      window.history.replaceState({}, document.title, window.location.pathname)
+    }
+  }
+
+  function clearPasswordResetToken() {
+    setPasswordResetToken(null)
 
     if (typeof window !== 'undefined') {
       window.history.replaceState({}, document.title, window.location.pathname)
@@ -279,6 +298,19 @@ export default function App() {
     }
   }, [shareExpiresAt])
 
+  if (passwordResetToken) {
+    return (
+      <PasswordResetScreen
+        token={passwordResetToken}
+        onReset={async (token, newPassword) => {
+          await authService.resetPassword(token, newPassword)
+          clearAuthenticatedWorkspace()
+        }}
+        onBackToLogin={clearPasswordResetToken}
+      />
+    )
+  }
+
   if (verificationToken) {
     return (
       <EmailVerificationScreen
@@ -329,8 +361,8 @@ export default function App() {
           setCurrentProfileId(profile.id)
           await loadProfileWorkspace(profile.id)
         }}
-        onResetPassword={(credentials) => authService.resetPassword(credentials)}
-        allowResetPassword={false}
+        onRequestPasswordReset={(email) => authService.requestPasswordReset(email)}
+        allowResetPassword={appConfig.authMode === 'remote'}
       />
     )
   }
@@ -791,6 +823,8 @@ export default function App() {
         onChangePassword={async (values) => {
           await authService.changePassword(currentProfile.id, values)
         }}
+        onRequestPasswordReset={(email) => authService.requestPasswordReset(email)}
+        allowPasswordReset={appConfig.authMode === 'remote'}
         onDeleteAccount={handleDeleteAccount}
       />
 

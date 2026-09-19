@@ -109,9 +109,15 @@ export class AppAuthService implements AuthService {
     throw new Error('Ponowne wysłanie linku jest dostępne tylko w trybie zdalnym.')
   }
 
-  async resetPassword(input: LoginCredentials) {
-    void input
-    throw new Error('Reset hasła jest niedostępny lokalnie. Zaloguj się i użyj opcji "Zmień hasło".')
+  async requestPasswordReset(username: string) {
+    void username
+    throw new Error('Odzyskiwanie hasła przez e-mail jest dostępne tylko w trybie zdalnym.')
+  }
+
+  async resetPassword(token: string, newPassword: string) {
+    void token
+    void newPassword
+    throw new Error('Reset hasła przez e-mail jest dostępny tylko w trybie zdalnym.')
   }
 
   async changePassword(profileId: string, input: { currentPassword: string; newPassword: string }) {

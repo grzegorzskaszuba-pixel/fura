@@ -9,7 +9,7 @@ const { sendMock, ResendMock } = vi.hoisted(() => ({
 
 vi.mock('resend', () => ({ Resend: ResendMock }))
 
-import { sendEmailVerificationEmail, sendTestEmail } from '../email-service.mjs'
+import { sendEmailVerificationEmail, sendPasswordChangedEmail, sendPasswordResetEmail, sendTestEmail } from '../email-service.mjs'
 
 const originalApiKey = process.env.RESEND_API_KEY
 const originalWebBaseUrl = process.env.AUTH_WEB_BASE_URL
@@ -91,5 +91,24 @@ describe('email service', () => {
     expect(emailPayload.html).toContain('https://fura.info/verify-email?token=verification-token')
     expect(emailPayload.html).toContain('Prosty dziennik serwisowy dla każdego auta.')
     expect(emailPayload.html).toContain('#f97316')
+  })
+
+  it('sends a password reset link with its expiry and a password change notice', async () => {
+    process.env.RESEND_API_KEY = 'test-key'
+    process.env.AUTH_WEB_BASE_URL = 'https://fura.info/'
+    sendMock.mockResolvedValue({ data: { id: 'password-email-id' }, error: null })
+
+    await expect(sendPasswordResetEmail('driver@example.com', 'password-token')).resolves.toEqual({ id: 'password-email-id' })
+    await expect(sendPasswordChangedEmail('driver@example.com')).resolves.toEqual({ id: 'password-email-id' })
+
+    const resetPayload = sendMock.mock.calls[0]?.[0] as { subject: string; text: string; html: string }
+    const changedPayload = sendMock.mock.calls[1]?.[0] as { subject: string; text: string; html: string }
+
+    expect(resetPayload.subject).toBe('Reset hasła w FURA')
+    expect(resetPayload.text).toContain('Link jest ważny przez 30 minut i może zostać użyty tylko raz.')
+    expect(resetPayload.text).toContain('https://fura.info/reset-password?token=password-token')
+    expect(resetPayload.html).toContain('Ustaw nowe hasło')
+    expect(changedPayload.subject).toBe('Hasło do konta FURA zostało zmienione')
+    expect(changedPayload.text).toContain('Hasło do konta FURA zostało zmienione. Jeśli to nie Ty, skontaktuj się z nami.')
   })
 })

@@ -18,6 +18,7 @@ const emptyState = {
   shareBrochures: [],
   emailVerificationTokens: [],
   pendingEmailRegistrations: [],
+  passwordResetTokens: [],
 }
 
 const storageMode = String(process.env.AUTH_STORAGE ?? '').trim().toLowerCase()
@@ -221,6 +222,7 @@ function normalizeState(candidate) {
     shareBrochures: Array.isArray(candidate.shareBrochures) ? candidate.shareBrochures : [],
     emailVerificationTokens: Array.isArray(candidate.emailVerificationTokens) ? candidate.emailVerificationTokens : [],
     pendingEmailRegistrations: Array.isArray(candidate.pendingEmailRegistrations) ? candidate.pendingEmailRegistrations : [],
+    passwordResetTokens: Array.isArray(candidate.passwordResetTokens) ? candidate.passwordResetTokens : [],
   }
 
   return normalized
@@ -425,6 +427,20 @@ async function initializeNormalizedPostgresStorage() {
     `)
 
     await pgPool.query('CREATE INDEX IF NOT EXISTS pending_email_registrations_expires_idx ON pending_email_registrations (expires_at)')
+
+    await pgPool.query(`
+      CREATE TABLE IF NOT EXISTS password_reset_tokens (
+        id UUID PRIMARY KEY,
+        profile_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+        token_hash TEXT UNIQUE NOT NULL,
+        expires_at TIMESTAMPTZ NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL,
+        used_at TIMESTAMPTZ
+      )
+    `)
+
+    await pgPool.query('CREATE INDEX IF NOT EXISTS password_reset_tokens_profile_idx ON password_reset_tokens (profile_id)')
+    await pgPool.query('CREATE INDEX IF NOT EXISTS password_reset_tokens_expires_idx ON password_reset_tokens (expires_at)')
   })
 
   await withPostgresRetry(async () => {

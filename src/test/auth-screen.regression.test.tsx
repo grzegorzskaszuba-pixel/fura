@@ -1,4 +1,5 @@
 import { act, render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { StrictMode } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -8,6 +9,7 @@ import { EMAIL_VERIFICATION_COMPLETED_STORAGE_KEY } from '@/features/auth/email-
 import { EmailVerificationPending } from '@/features/auth/email-verification-pending'
 import { AuthScreen } from '@/features/auth/auth-screen'
 import { EmailVerificationScreen } from '@/features/auth/email-verification-screen'
+import { PasswordResetScreen } from '@/features/auth/password-reset-screen'
 
 describe('Auth screen regression', () => {
   afterEach(() => {
@@ -65,6 +67,45 @@ describe('Auth screen regression', () => {
     })
 
     expect(screen.queryByText('Potwierdzanie adresu e-mail...')).not.toBeInTheDocument()
+  })
+
+  it('requests a password reset link from the login screen', async () => {
+    const user = userEvent.setup()
+    const requestPasswordReset = vi.fn().mockResolvedValue(undefined)
+
+    render(
+      <AuthScreen
+        onLogin={async () => undefined}
+        onRegister={async () => undefined}
+        onRequestPasswordReset={requestPasswordReset}
+        allowResetPassword
+      />,
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Nie pamiętam hasła' }))
+    await user.type(screen.getByLabelText('E-mail użytkownika'), 'driver@example.com')
+    await user.click(screen.getByRole('button', { name: 'Wyślij link resetujący' }))
+
+    await waitFor(() => {
+      expect(requestPasswordReset).toHaveBeenCalledWith('driver@example.com')
+    })
+    expect(screen.getByText('Jeśli konto jest przypisane do tego adresu, link resetujący został wysłany. Sprawdź skrzynkę pocztową.')).toBeInTheDocument()
+  })
+
+  it('sets a new password from a reset link', async () => {
+    const user = userEvent.setup()
+    const resetPassword = vi.fn().mockResolvedValue(undefined)
+
+    render(<PasswordResetScreen token="reset-token" onReset={resetPassword} onBackToLogin={() => undefined} />)
+
+    await user.type(screen.getByLabelText('Nowe hasło'), 'new-pass-1')
+    await user.type(screen.getByLabelText('Powtórz nowe hasło'), 'new-pass-1')
+    await user.click(screen.getByRole('button', { name: 'Ustaw nowe hasło' }))
+
+    await waitFor(() => {
+      expect(resetPassword).toHaveBeenCalledWith('reset-token', 'new-pass-1')
+    })
+    expect(screen.getByText('Hasło zostało zmienione')).toBeInTheDocument()
   })
 
   it('settles the verification result when StrictMode replays the effect', async () => {

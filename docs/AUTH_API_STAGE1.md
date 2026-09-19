@@ -25,6 +25,8 @@ Bazowy prefiks: `${VITE_API_BASE_URL}/auth`
 - `POST /login` body: `{ username: email, password }` -> `{ profile }`
 - `POST /register` body: `{ username: email, password, displayName }` -> `{ profile }`
 - `POST /reset-password` body: `{ username: email, password }` -> `204/200`
+- `POST /password-reset/request` body: `{ username: email }` -> `{ ok: true }` (neutral response)
+- `POST /password-reset/confirm` body: `{ token, password }` -> `{ ok: true }`
 - `POST /change-password` body: `{ profileId, currentPassword, newPassword }` -> `204/200`
 - `POST /switch-profile` body: `{ profileId }` -> `{ profile }`
 - `POST /logout` -> `204/200`

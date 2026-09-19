@@ -12,8 +12,9 @@ import {
   registerProfile,
   resetPassword,
 } from './auth-core.mjs'
-import { sendEmailVerificationEmail, sendTestEmail } from './email-service.mjs'
+import { sendEmailVerificationEmail, sendPasswordChangedEmail, sendPasswordResetEmail, sendTestEmail } from './email-service.mjs'
 import { createEmailVerificationToken, hashEmailVerificationToken, isEmailVerificationTokenUsable } from './email-verification.mjs'
+import { createPasswordResetToken, hashPasswordResetToken, isPasswordResetTokenUsable } from './password-reset.mjs'
 import { StorageError, initializeStorage, isPostgresStorage, postgresQuery, postgresTransaction, readState, writeState } from './storage.mjs'
 
 const PORT = Number(process.env.AUTH_API_PORT ?? process.env.PORT ?? 8787)
@@ -144,6 +145,24 @@ function logVerificationDelivery(recipient, delivery) {
     recipient,
     deliveryId: delivery?.id ?? null,
   })
+}
+
+function logPasswordResetDelivery(recipient, delivery) {
+  // eslint-disable-next-line no-console
+  console.log('[auth-api] password reset email accepted by Resend', {
+    recipient,
+    deliveryId: delivery?.id ?? null,
+  })
+}
+
+async function notifyPasswordChanged(recipient) {
+  try {
+    const delivery = await sendPasswordChangedEmail(recipient)
+    logPasswordResetDelivery(recipient, delivery)
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('[auth-api] password changed email failed', error)
+  }
 }
 
 function setHtml(response, statusCode, html) {
@@ -1952,6 +1971,178 @@ async function handleAuthRequest(request, response) {
     return
   }
 
+  if (pathname === '/api/auth/password-reset/request' && method === 'POST') {
+    const payload = await readJsonBody(request)
+    const username = normalizeEmail(payload.username ?? payload.email)
+
+    if (isPostgresStorage()) {
+      const result = await postgresQuery(
+        'SELECT id, username FROM profiles WHERE username = ANY($1::text[]) LIMIT 1',
+        [getLoginCandidates(username)],
+      )
+      const profile = result.rows[0]
+
+      if (profile) {
+        const passwordReset = createPasswordResetToken(profile.id)
+        await postgresTransaction(async (client) => {
+          await client.query('DELETE FROM password_reset_tokens WHERE profile_id = $1', [profile.id])
+          await client.query(
+            `
+              INSERT INTO password_reset_tokens (id, profile_id, token_hash, expires_at, created_at)
+              VALUES ($1, $2, $3, $4, $5)
+            `,
+            [passwordReset.record.id, passwordReset.record.profileId, passwordReset.record.tokenHash, passwordReset.record.expiresAt, passwordReset.record.createdAt],
+          )
+        })
+
+        try {
+          const delivery = await sendPasswordResetEmail(profile.username, passwordReset.token)
+          logPasswordResetDelivery(profile.username, delivery)
+        } catch (error) {
+          // Do not reveal whether the address exists when the mail provider is unavailable.
+          // eslint-disable-next-line no-console
+          console.error('[auth-api] password reset email failed', error)
+        }
+      }
+
+      setJson(response, 200, { ok: true })
+      return
+    }
+
+    const state = await readState()
+    const profile = state.profiles.find((entry) => getLoginCandidates(username).includes(entry.username))
+
+    if (profile) {
+      const passwordReset = createPasswordResetToken(profile.id)
+      state.passwordResetTokens = (state.passwordResetTokens ?? []).filter((entry) => entry.profileId !== profile.id)
+      state.passwordResetTokens.push(passwordReset.record)
+      await writeState(state)
+
+      try {
+        const delivery = await sendPasswordResetEmail(profile.username, passwordReset.token)
+        logPasswordResetDelivery(profile.username, delivery)
+      } catch (error) {
+        // Do not reveal whether the address exists when the mail provider is unavailable.
+        // eslint-disable-next-line no-console
+        console.error('[auth-api] password reset email failed', error)
+      }
+    }
+
+    setJson(response, 200, { ok: true })
+    return
+  }
+
+  if (pathname === '/api/auth/password-reset/confirm' && method === 'POST') {
+    const payload = await readJsonBody(request)
+    const token = String(payload.token ?? '').trim()
+    const password = String(payload.password ?? payload.newPassword ?? '')
+
+    if (!token) {
+      setJson(response, 400, { message: 'Brak tokenu resetu hasła' })
+      return
+    }
+
+    const tokenHash = hashPasswordResetToken(token)
+
+    if (isPostgresStorage()) {
+      const reset = await postgresTransaction(async (client) => {
+        const result = await client.query(
+          `
+            SELECT
+              password_reset.id,
+              password_reset.profile_id,
+              p.username,
+              c.username AS credential_username,
+              c.password_hash,
+              c.password_salt,
+              c.created_at AS credential_created_at,
+              c.updated_at AS credential_updated_at
+            FROM password_reset_tokens password_reset
+            JOIN profiles p ON p.id = password_reset.profile_id
+            JOIN credentials c ON c.profile_id = password_reset.profile_id
+            WHERE password_reset.token_hash = $1
+              AND password_reset.used_at IS NULL
+              AND password_reset.expires_at > NOW()
+            FOR UPDATE OF password_reset
+          `,
+          [tokenHash],
+        )
+        const row = result.rows[0]
+
+        if (!row) {
+          return null
+        }
+
+        const localState = {
+          profiles: [{ id: row.profile_id, username: row.username, displayName: '', createdAt: row.credential_created_at, updatedAt: row.credential_updated_at }],
+          credentials: [
+            {
+              profileId: row.profile_id,
+              username: row.credential_username,
+              passwordHash: row.password_hash,
+              passwordSalt: row.password_salt,
+              createdAt: row.credential_created_at,
+              updatedAt: row.credential_updated_at,
+            },
+          ],
+          vehicles: [],
+          serviceEvents: [],
+        }
+
+        resetPassword(localState, { username: row.credential_username, password })
+        const updatedCredential = localState.credentials[0]
+
+        await client.query(
+          'UPDATE credentials SET password_hash = $1, password_salt = $2, updated_at = $3 WHERE profile_id = $4',
+          [updatedCredential.passwordHash, updatedCredential.passwordSalt, updatedCredential.updatedAt, row.profile_id],
+        )
+        await client.query('UPDATE password_reset_tokens SET used_at = NOW() WHERE id = $1', [row.id])
+        await client.query('UPDATE profiles SET updated_at = NOW() WHERE id = $1', [row.profile_id])
+
+        return { profileId: row.profile_id, username: row.username }
+      })
+
+      if (!reset) {
+        setJson(response, 400, { message: 'Link resetu hasła jest nieprawidłowy, zużyty lub wygasł' })
+        return
+      }
+
+      invalidateProfileSessions(reset.profileId)
+
+      await notifyPasswordChanged(reset.username)
+
+      setJson(response, 200, { ok: true })
+      return
+    }
+
+    const state = await readState()
+    const reset = (state.passwordResetTokens ?? []).find((entry) => entry.tokenHash === tokenHash)
+
+    if (!isPasswordResetTokenUsable(reset)) {
+      setJson(response, 400, { message: 'Link resetu hasła jest nieprawidłowy, zużyty lub wygasł' })
+      return
+    }
+
+    const profile = state.profiles.find((entry) => entry.id === reset.profileId)
+    const credential = state.credentials.find((entry) => entry.profileId === reset.profileId)
+
+    if (!profile || !credential) {
+      setJson(response, 400, { message: 'Link resetu hasła jest nieprawidłowy, zużyty lub wygasł' })
+      return
+    }
+
+    resetPassword(state, { username: credential.username, password })
+    reset.usedAt = new Date().toISOString()
+    profile.updatedAt = reset.usedAt
+    await writeState(state)
+    invalidateProfileSessions(profile.id)
+
+    await notifyPasswordChanged(profile.username)
+
+    setJson(response, 200, { ok: true })
+    return
+  }
+
   if (pathname === '/api/auth/verify-email' && method === 'POST') {
     const payload = await readJsonBody(request)
     const token = String(payload.token ?? '').trim()
@@ -2595,6 +2786,7 @@ async function handleAuthRequest(request, response) {
         updatedCredential.profileId,
       ])
 
+      await notifyPasswordChanged(row.username)
       setJson(response, 200, { ok: true })
       return
     }
@@ -2610,6 +2802,7 @@ async function handleAuthRequest(request, response) {
     resetPassword(state, payload)
 
     await writeState(state)
+    await notifyPasswordChanged(credential.username)
     setJson(response, 200, { ok: true })
     return
   }
@@ -2686,6 +2879,7 @@ async function handleAuthRequest(request, response) {
         updatedCredential.profileId,
       ])
 
+      await notifyPasswordChanged(row.username)
       setJson(response, 200, { ok: true })
       return
     }
@@ -2693,6 +2887,8 @@ async function handleAuthRequest(request, response) {
     const state = await readState()
     changePassword(state, payload)
     await writeState(state)
+    const credential = state.credentials.find((entry) => entry.profileId === sessionProfileId)
+    await notifyPasswordChanged(credential?.username ?? '')
     setJson(response, 200, { ok: true })
     return
   }

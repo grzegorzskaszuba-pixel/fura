@@ -70,9 +70,21 @@ export class RemoteAuthService implements AuthService {
     })
   }
 
-  async resetPassword(input: LoginCredentials) {
-    void input
-    throw new Error('Reset hasła jest niedostępny. Zaloguj się i użyj opcji "Zmień hasło".')
+  async requestPasswordReset(username: string) {
+    await httpRequest<void>(`${this.baseUrl}/password-reset/request`, {
+      method: 'POST',
+      body: { username },
+    })
+  }
+
+  async resetPassword(token: string, newPassword: string) {
+    await httpRequest<void>(`${this.baseUrl}/password-reset/confirm`, {
+      method: 'POST',
+      body: { token, password: newPassword },
+    })
+
+    clearSessionToken()
+    await appStateRepository.setCurrentProfileId(null)
   }
 
   async changePassword(profileId: string, input: { currentPassword: string; newPassword: string }) {
