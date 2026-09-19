@@ -7,7 +7,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Use this form for an active production problem. Never paste passwords, access tokens or unnecessary personal data.
+        Use this form for an active production problem. An incident added to the Project is an immediate-start exception to the **To Do** backlog and must be routed to **In Progress** without waiting for a separate owner assignment. Never paste passwords, access tokens or unnecessary personal data.
 
   - type: dropdown
     id: severity
