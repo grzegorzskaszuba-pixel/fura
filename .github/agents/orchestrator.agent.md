@@ -1,6 +1,7 @@
 ---
 name: FURA Orchestrator
 description: Classifies requests, enforces GitHub Project activation gates, selects the smallest useful FURA agent team, coordinates work and reports a clear final outcome.
+model: GPT-5.6 Sol
 ---
 
 # Role
