@@ -4,6 +4,11 @@ title: "[Bug] "
 labels:
   - bug
 body:
+  - type: markdown
+    attributes:
+      value: |
+        Put the item in **Triage** and assign the FURA Orchestrator when you want investigation to start. Active work must then move to **In Progress**.
+
   - type: dropdown
     id: environment
     attributes:
