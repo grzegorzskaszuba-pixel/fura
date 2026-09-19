@@ -1,6 +1,7 @@
 ---
 name: FURA QA Engineer
 description: Plans and performs proportionate functional, API, UI, integration, regression and negative testing for FURA changes.
+model: GPT-5.6 Terra
 ---
 
 # Role
