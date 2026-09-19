@@ -1,5 +1,5 @@
 import { ChevronLeft, ChevronRight, FileImage, FileSpreadsheet, FileText, ImageIcon, Paperclip, X } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import {
   AlertDialog,
@@ -16,7 +16,6 @@ import { Badge } from '@/shared/components/ui/badge'
 import { Button } from '@/shared/components/ui/button'
 import { ResponsiveModal } from '@/shared/components/responsive-modal'
 import { GoogleMiniMap } from '@/shared/components/google-mini-map'
-import { useMediaQuery } from '@/shared/hooks/use-media-query'
 import { getAttachmentExtension, isImageAttachment, normalizeServiceAttachments } from '@/shared/lib/attachments'
 import { serviceCategoryLabels } from '@/shared/constants/service-categories'
 import { cn } from '@/shared/lib/utils'
@@ -35,8 +34,6 @@ interface ServiceEventDetailProps {
 }
 
 export function ServiceEventDetail({ event, vehicle, open, onOpenChange, onEdit, onDelete, onMarkCompleted }: ServiceEventDetailProps) {
-  const isMobile = useMediaQuery('(max-width: 767px)')
-  const galleryViewportRef = useRef<HTMLDivElement | null>(null)
   const attachments = useMemo(() => normalizeServiceAttachments(event ?? {}), [event])
   const [activeAttachmentIndex, setActiveAttachmentIndex] = useState(0)
   const [viewerOpen, setViewerOpen] = useState(false)
@@ -52,53 +49,10 @@ export function ServiceEventDetail({ event, vehicle, open, onOpenChange, onEdit,
     setViewerOpen(false)
   }, [event?.id, open])
 
-  useEffect(() => {
-    if (!open || attachments.length <= 1) {
-      return
-    }
-
-    scrollGalleryToIndex(activeAttachmentIndex, 'auto')
-  }, [activeAttachmentIndex, attachments.length, open])
-
-  function scrollGalleryToIndex(index: number, behavior: ScrollBehavior) {
-    const viewport = galleryViewportRef.current
-
-    if (!viewport) {
-      return
-    }
-
-    const left = viewport.clientWidth * index
-
-    if (typeof viewport.scrollTo !== 'function') {
-      viewport.scrollLeft = left
-      return
-    }
-
-    viewport.scrollTo({
-      left,
-      behavior,
-    })
-  }
-
-  function selectAttachment(index: number, behavior: ScrollBehavior = 'smooth') {
+  function selectAttachment(index: number) {
     const nextIndex = Math.max(0, Math.min(index, attachments.length - 1))
 
     setActiveAttachmentIndex(nextIndex)
-    scrollGalleryToIndex(nextIndex, behavior)
-  }
-
-  function handleGalleryScroll() {
-    const viewport = galleryViewportRef.current
-
-    if (!viewport) {
-      return
-    }
-
-    const nextIndex = Math.round(viewport.scrollLeft / Math.max(viewport.clientWidth, 1))
-
-    if (nextIndex !== activeAttachmentIndex) {
-      setActiveAttachmentIndex(Math.max(0, Math.min(nextIndex, attachments.length - 1)))
-    }
   }
 
   if (!event) {
@@ -164,67 +118,27 @@ export function ServiceEventDetail({ event, vehicle, open, onOpenChange, onEdit,
 
         {attachments.length > 0 ? (
           <div className="space-y-3" data-testid="attachment-gallery">
-            <div className="flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-[0.9rem] font-semibold uppercase tracking-[0.14em] text-zinc-950">Załączniki</p>
-                <p className="truncate text-sm font-medium text-zinc-700">
-                  {activeAttachment?.name} {attachments.length > 1 ? `(${activeAttachmentIndex + 1}/${attachments.length})` : ''}
-                </p>
-              </div>
-              {!isMobile && attachments.length > 1 ? (
-                <div className="flex items-center gap-2">
-                  <Button type="button" variant="outline" size="icon" aria-label="Poprzedni załącznik" onClick={() => selectAttachment(activeAttachmentIndex - 1)}>
-                    <ChevronLeft className="h-4 w-4" />
-                  </Button>
-                  <Button type="button" variant="outline" size="icon" aria-label="Następny załącznik" onClick={() => selectAttachment(activeAttachmentIndex + 1)}>
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                </div>
-              ) : null}
+            <p className="text-[0.9rem] font-semibold uppercase tracking-[0.14em] text-zinc-950">Załączniki</p>
+            <div className="flex flex-wrap items-center justify-center gap-3 rounded-3xl border border-zinc-200 bg-white p-4">
+              {attachments.map((attachment, index) => (
+                <button
+                  key={attachment.id}
+                  type="button"
+                  data-testid={`attachment-thumbnail-${index}`}
+                  aria-label={`Otwórz załącznik ${index + 1}`}
+                  className={cn(
+                    'h-16 w-16 shrink-0 overflow-hidden rounded-full border-2 bg-zinc-50 p-1 transition sm:h-20 sm:w-20',
+                    index === activeAttachmentIndex ? 'border-zinc-950 ring-2 ring-zinc-950/10' : 'border-zinc-200 hover:border-zinc-300',
+                  )}
+                  onClick={() => {
+                    selectAttachment(index)
+                    setViewerOpen(true)
+                  }}
+                >
+                  <AttachmentPreview attachment={attachment} compact />
+                </button>
+              ))}
             </div>
-
-            <div className="relative">
-              <div
-                ref={galleryViewportRef}
-                className="flex snap-x snap-mandatory overflow-x-auto scroll-smooth [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
-                onScroll={handleGalleryScroll}
-              >
-                {attachments.map((attachment, index) => (
-                  <div key={attachment.id} className="min-w-full shrink-0 snap-center" data-attachment-slide={index}>
-                    <button
-                      type="button"
-                      data-testid={`attachment-slide-${index}`}
-                      className="flex h-[130px] w-full items-center justify-center overflow-hidden rounded-[24px] border border-zinc-200 bg-zinc-50 text-left transition hover:border-zinc-300 sm:h-[160px]"
-                      onClick={() => setViewerOpen(true)}
-                    >
-                      <AttachmentPreview attachment={attachment} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {attachments.length > 1 ? (
-              <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-                {attachments.map((attachment, index) => (
-                  <button
-                    key={attachment.id}
-                    type="button"
-                    data-testid={`attachment-thumbnail-${index}`}
-                    aria-pressed={index === activeAttachmentIndex}
-                    className={cn(
-                      'h-14 shrink-0 aspect-[4/3] overflow-hidden rounded-2xl border bg-zinc-50 p-1 transition sm:h-16',
-                      index === activeAttachmentIndex ? 'border-zinc-950 ring-2 ring-zinc-950/10' : 'border-zinc-200 hover:border-zinc-300',
-                    )}
-                    onClick={() => selectAttachment(index)}
-                  >
-                    <AttachmentPreview attachment={attachment} compact />
-                  </button>
-                ))}
-              </div>
-            ) : null}
-
-            <p className="text-xs text-zinc-500">Przesuń załączniki w bok na telefonie albo użyj strzałek na większym ekranie.</p>
           </div>
         ) : null}
 
@@ -336,7 +250,7 @@ function AttachmentPreview({ attachment, compact = false, enlarged = false }: { 
       <div className={cn('flex items-center justify-center rounded-full bg-white/80 text-zinc-700 shadow-sm', compact ? 'h-10 w-10' : 'h-16 w-16')}>
         <Icon className={compact ? 'h-5 w-5' : 'h-8 w-8'} />
       </div>
-      <p className={cn('mt-3 max-w-full truncate font-semibold text-zinc-900', compact ? 'text-xs' : enlarged ? 'text-lg' : 'text-sm')}>{attachment.name}</p>
+      {!compact ? <p className={cn('mt-3 max-w-full truncate font-semibold text-zinc-900', enlarged ? 'text-lg' : 'text-sm')}>{attachment.name}</p> : null}
       {!compact ? <p className="mt-1 text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500">{extension}</p> : null}
     </div>
   )

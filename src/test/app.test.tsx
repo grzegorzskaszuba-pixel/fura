@@ -147,13 +147,11 @@ describe('App MVP flow', () => {
     )
 
     expect(await screen.findByTestId('attachment-gallery')).toBeInTheDocument()
-    expect(screen.getByText('silnik-po-serwisie.png (1/2)')).toBeInTheDocument()
+    expect(screen.queryByText('silnik-po-serwisie.png')).not.toBeInTheDocument()
 
     await user.click(screen.getByTestId('attachment-thumbnail-1'))
-    expect(screen.getByText('faktura-serwisowa.pdf (2/2)')).toBeInTheDocument()
-
-    await user.click(screen.getByTestId('attachment-slide-1'))
     expect(await screen.findByTestId('attachment-lightbox')).toBeInTheDocument()
+    expect(screen.getByTestId('attachment-lightbox')).toHaveTextContent('faktura-serwisowa.pdf')
 
     fireEvent.click(screen.getByLabelText('Zamknij podgląd załącznika'))
 
