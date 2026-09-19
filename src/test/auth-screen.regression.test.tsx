@@ -92,6 +92,22 @@ describe('Auth screen regression', () => {
     expect(screen.getByText('Jeśli konto jest przypisane do tego adresu, link resetujący został wysłany. Sprawdź skrzynkę pocztową.')).toBeInTheDocument()
   })
 
+  it('styles the password reset link with the requested size and spacing', () => {
+    render(
+      <AuthScreen
+        onLogin={async () => undefined}
+        onRegister={async () => undefined}
+        onRequestPasswordReset={async () => undefined}
+        allowResetPassword
+      />,
+    )
+
+    const resetLink = screen.getByRole('button', { name: 'Nie pamiętam hasła' })
+
+    expect(resetLink).toHaveClass('text-xs')
+    expect(resetLink.parentElement).toHaveClass('gap-[22px]')
+  })
+
   it('sets a new password from a reset link', async () => {
     const user = userEvent.setup()
     const resetPassword = vi.fn().mockResolvedValue(undefined)

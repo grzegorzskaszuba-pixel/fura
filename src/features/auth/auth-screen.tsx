@@ -191,13 +191,13 @@ export function AuthScreen({ onLogin, onRegister, onRequestPasswordReset, allowR
 
                   {error ? <p className="text-sm text-red-600">{error}</p> : null}
 
-                  <div className="flex flex-col gap-3 pt-2">
+                  <div className="flex flex-col gap-[22px] pt-2">
                     <Button type="submit" size="lg" disabled={isSubmitting}>
                       {isSubmitting ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}
                       {isSubmitting ? (mode === 'login' ? 'Trwa logowanie...' : 'Tworzenie profilu...') : mode === 'login' ? 'Zaloguj' : 'Utwórz profil'}
                     </Button>
                     {mode === 'login' && allowResetPassword ? (
-                      <button type="button" className="text-sm font-medium text-zinc-600 underline-offset-4 hover:text-zinc-950 hover:underline" onClick={() => setShowPasswordRecovery(true)}>
+                      <button type="button" className="text-xs font-medium text-zinc-600 underline-offset-4 hover:text-zinc-950 hover:underline" onClick={() => setShowPasswordRecovery(true)}>
                         Nie pamiętam hasła
                       </button>
                     ) : null}
