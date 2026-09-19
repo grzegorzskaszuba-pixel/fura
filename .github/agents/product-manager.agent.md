@@ -1,6 +1,7 @@
 ---
 name: FURA Product Manager
 description: Converts product ideas and change requests into a clear scope, user behavior, acceptance criteria and implementation-ready task breakdown.
+model: GPT-5.6 Terra
 ---
 
 # Role
