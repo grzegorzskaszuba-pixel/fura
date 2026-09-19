@@ -1,0 +1,45 @@
+name: "🧱 Technical Enabler"
+description: "Propose technical debt, platform, architecture or engineering enablement work."
+title: "[Enabler] "
+labels:
+  - enabler
+body:
+  - type: textarea
+    id: need
+    attributes:
+      label: Technical need
+      description: What technical capability, debt reduction or engineering improvement is needed?
+    validations:
+      required: true
+
+  - type: textarea
+    id: value
+    attributes:
+      label: Why it matters
+      description: What delivery, reliability, security, maintainability or cost benefit will it provide?
+    validations:
+      required: true
+
+  - type: textarea
+    id: affected-area
+    attributes:
+      label: Affected area
+      description: Identify the likely frontend, backend, database, CI/CD, hosting, observability or integration area.
+    validations:
+      required: true
+
+  - type: textarea
+    id: constraints
+    attributes:
+      label: Constraints and dependencies
+      description: Add known limitations, prerequisites, risks or related issues.
+    validations:
+      required: false
+
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Expected technical outcome
+      description: Describe how we will know this enabler is complete and useful.
+    validations:
+      required: true

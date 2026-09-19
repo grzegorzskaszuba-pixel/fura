@@ -1,0 +1,45 @@
+name: "🚀 Enhancement"
+description: "Suggest a new feature or capability for FURA."
+title: "[Enhancement] "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe the idea at a high level. Detailed refinement will happen after the item is moved to **Ready for Refinement**.
+
+  - type: textarea
+    id: idea
+    attributes:
+      label: Idea
+      description: What would you like FURA to do?
+      placeholder: Describe the feature in a few sentences.
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or opportunity
+      description: What user need or opportunity does this address?
+      placeholder: Today the user cannot... / It would be useful if...
+    validations:
+      required: true
+
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Desired outcome
+      description: What should become possible when this is complete?
+      placeholder: A user should be able to...
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Add examples, screenshots, links or early ideas if available.
+    validations:
+      required: false

@@ -1,0 +1,43 @@
+name: "🟡 Problem or Improvement"
+description: "Describe something that works but should work better."
+title: "[Problem] "
+labels:
+  - problem
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form when the current behavior is inconvenient, confusing or inefficient, but not necessarily broken.
+
+  - type: textarea
+    id: current-situation
+    attributes:
+      label: Current situation
+      description: What currently happens and where is the difficulty?
+    validations:
+      required: true
+
+  - type: textarea
+    id: impact
+    attributes:
+      label: Impact
+      description: Who is affected and how often does the problem occur?
+      placeholder: Users affected, frequency, wasted time or confusion.
+    validations:
+      required: true
+
+  - type: textarea
+    id: desired-improvement
+    attributes:
+      label: Desired improvement
+      description: What should work better? A finished solution is not required.
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Examples or evidence
+      description: Add screenshots, links, measurements or examples if available.
+    validations:
+      required: false

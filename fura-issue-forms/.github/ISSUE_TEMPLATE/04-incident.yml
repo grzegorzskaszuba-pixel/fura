@@ -1,0 +1,74 @@
+name: "🚨 Production Incident"
+description: "Report an active outage, unavailable feature or serious production degradation."
+title: "[Incident] "
+labels:
+  - incident
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form for an active production problem. Never paste passwords, access tokens or unnecessary personal data.
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Initial severity
+      description: Select the best current estimate. The Incident Manager may change it after triage.
+      options:
+        - "SEV1 — widespread outage, serious data loss or exposure"
+        - "SEV2 — major feature unavailable or severely degraded"
+        - "SEV3 — contained issue with a workaround"
+        - "SEV4 — minor operational issue"
+        - "Not sure"
+    validations:
+      required: true
+
+  - type: input
+    id: started-at
+    attributes:
+      label: Started at
+      description: When was the issue first observed? Include timezone if known.
+      placeholder: "2026-09-19 20:30 CEST or unknown"
+    validations:
+      required: true
+
+  - type: textarea
+    id: symptom
+    attributes:
+      label: Current symptom
+      description: What is unavailable, failing or degraded right now?
+    validations:
+      required: true
+
+  - type: textarea
+    id: impact
+    attributes:
+      label: User and data impact
+      description: Who is affected? Is there a risk to data confidentiality, integrity or availability?
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence
+      description: Add safe excerpts from logs, errors, monitoring or API responses.
+      render: shell
+    validations:
+      required: false
+
+  - type: textarea
+    id: recent-changes
+    attributes:
+      label: Recent changes
+      description: List recent deployments, configuration changes or external service problems. Do not assume they are the cause.
+    validations:
+      required: false
+
+  - type: textarea
+    id: workaround
+    attributes:
+      label: Workaround or actions already taken
+      description: Describe any mitigation attempted and its result.
+    validations:
+      required: false

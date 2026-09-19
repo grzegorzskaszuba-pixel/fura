@@ -1,0 +1,77 @@
+name: "🐛 Bug Report"
+description: "Report behavior that is not working as expected."
+title: "[Bug] "
+labels:
+  - bug
+body:
+  - type: dropdown
+    id: environment
+    attributes:
+      label: Environment
+      description: Where did the problem occur?
+      options:
+        - Production
+        - Test or preview environment
+        - Local development
+        - Not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual-behavior
+    attributes:
+      label: What happened?
+      description: Describe the incorrect behavior and any visible error.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected-behavior
+    attributes:
+      label: Expected behavior
+      description: What should have happened instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: Provide the smallest reliable sequence of actions.
+      placeholder: |
+        1. Sign in as...
+        2. Open...
+        3. Select...
+        4. Observe...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: frequency
+    attributes:
+      label: Frequency
+      options:
+        - Every time
+        - Often
+        - Sometimes
+        - Happened once
+        - Not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence and technical context
+      description: Add screenshots, console errors, API responses or relevant logs. Remove secrets and personal data.
+      render: shell
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional context
+      description: Browser/device, vehicle data conditions, recent changes or a possible workaround.
+    validations:
+      required: false

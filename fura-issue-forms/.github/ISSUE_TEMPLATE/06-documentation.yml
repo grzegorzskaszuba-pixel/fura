@@ -1,0 +1,54 @@
+name: "📚 Documentation"
+description: "Request a documentation correction, addition or improvement."
+title: "[Documentation] "
+labels:
+  - documentation
+body:
+  - type: dropdown
+    id: documentation-area
+    attributes:
+      label: Documentation area
+      options:
+        - User documentation
+        - README or local setup
+        - API documentation
+        - Architecture or technical decisions
+        - Deployment and operations
+        - Troubleshooting
+        - Release notes or changelog
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: current-gap
+    attributes:
+      label: Current gap or incorrect information
+      description: What is missing, unclear or no longer correct?
+    validations:
+      required: true
+
+  - type: textarea
+    id: requested-change
+    attributes:
+      label: Requested change
+      description: What should be added, corrected or explained?
+    validations:
+      required: true
+
+  - type: input
+    id: location
+    attributes:
+      label: Current location
+      description: Link or path to the affected documentation, if known.
+      placeholder: README.md, docs/deployment.md or a URL
+    validations:
+      required: false
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Add examples, source material or related issues.
+    validations:
+      required: false
