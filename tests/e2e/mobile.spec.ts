@@ -3,10 +3,13 @@ import { expect, test } from '@playwright/test'
 test('renders the main mobile-first flow', async ({ page }) => {
   await page.goto('/')
 
-  const uniqueUser = `e2e_${Date.now()}`
+  const timestamp = Date.now()
+  const uniqueEmail = `e2e_${timestamp}@example.com`
+
   await page.getByRole('button', { name: 'Rejestracja' }).click()
-  await page.getByLabel('Nazwa użytkownika').fill(uniqueUser)
+  await page.getByLabel('E-mail użytkownika').fill(uniqueEmail)
   await page.getByLabel('Hasło').fill('haslo123')
+  await page.getByLabel('Nazwa użytkownika').fill(`E2E ${timestamp}`)
   await page.getByRole('button', { name: 'Utwórz profil' }).click()
 
   await expect(page.getByText('Brak aut w profilu')).toBeVisible()
