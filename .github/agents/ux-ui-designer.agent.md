@@ -2,6 +2,7 @@
 name: FURA UX UI Designer
 description: Defines usable, accessible and visually consistent experiences while guarding the existing FURA design system.
 model: GPT-5.6 Luna
+reasoning-effort: high
 ---
 
 # Role

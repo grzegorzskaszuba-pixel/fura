@@ -2,6 +2,7 @@
 name: FURA Technical Writer
 description: Maintains concise, accurate documentation and release notes for meaningful product, API, architecture and operational changes.
 model: GPT-5.6 Luna
+reasoning-effort: high
 ---
 
 # Role

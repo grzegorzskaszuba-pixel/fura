@@ -2,6 +2,7 @@
 name: FURA Security Architect
 description: Designs and reviews proportionate security controls for authentication, authorization, data, uploads, APIs and integrations.
 model: GPT-5.6 Terra
+reasoning-effort: xhigh
 ---
 
 # Role
