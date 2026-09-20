@@ -97,6 +97,7 @@ describe('App MVP flow', () => {
 
   it('opens service attachments and enlarges the selected file', async () => {
     const user = userEvent.setup()
+    const onOpenChange = vi.fn()
 
     render(
       <ServiceEventDetail
@@ -139,7 +140,7 @@ describe('App MVP flow', () => {
           updatedAt: '2026-08-10T10:00:00.000Z',
         }}
         open
-        onOpenChange={() => undefined}
+        onOpenChange={onOpenChange}
         onEdit={() => undefined}
         onDelete={vi.fn().mockResolvedValue(undefined)}
         onMarkCompleted={vi.fn().mockResolvedValue(undefined)}
@@ -148,16 +149,20 @@ describe('App MVP flow', () => {
 
     expect(await screen.findByTestId('attachment-gallery')).toBeInTheDocument()
     expect(screen.queryByText('silnik-po-serwisie.png')).not.toBeInTheDocument()
+    expect(screen.getByTestId('attachment-thumbnail-0').querySelector('img')).toHaveClass('rounded-full')
+    expect(screen.getByTestId('attachment-thumbnail-1').querySelector('div')).toHaveClass('rounded-full')
 
     await user.click(screen.getByTestId('attachment-thumbnail-1'))
     expect(await screen.findByTestId('attachment-lightbox')).toBeInTheDocument()
     expect(screen.getByTestId('attachment-lightbox')).toHaveTextContent('faktura-serwisowa.pdf')
 
-    fireEvent.click(screen.getByLabelText('Zamknij podgląd załącznika'))
+    await user.click(screen.getByLabelText('Zamknij podgląd załącznika'))
 
     await waitFor(() => {
       expect(screen.queryByTestId('attachment-lightbox')).not.toBeInTheDocument()
     })
+    expect(screen.getByTestId('attachment-gallery')).toBeInTheDocument()
+    expect(onOpenChange).not.toHaveBeenCalled()
   })
 
   it('plans a service and shows it in the plan tab', async () => {
