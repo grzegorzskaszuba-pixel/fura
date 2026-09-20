@@ -135,6 +135,7 @@ describe('auth API integration', () => {
         AUTH_API_ALLOWED_ORIGINS: 'https://fura.info/',
         AUTH_DB_FILE: dbFile,
         AUTH_EMAIL_VERIFICATION_ENABLED: 'false',
+        RESEND_API_KEY: '',
         RESEND_TEST_TOKEN: '',
       },
       stdio: 'pipe',
@@ -284,6 +285,55 @@ describe('auth API integration', () => {
 
     expect(response.status).toBe(204)
     expect(response.headers.get('access-control-allow-origin')).toBe('https://fura.info')
+  })
+
+  it('does not delete the profile when confirmation or ownership is invalid', async () => {
+    sessionCookie = ''
+    const stamp = Date.now()
+    const username = `failed_delete_${stamp}@example.com`
+
+    const registerResponse = await apiRequest('/api/auth/register', {
+      method: 'POST',
+      body: {
+        username,
+        displayName: 'Failed Delete',
+        password: 'secret123',
+      },
+    })
+    const registerPayload = (await registerResponse.json()) as { profile: { id: string } }
+
+    expect(registerResponse.status).toBe(200)
+
+    const unconfirmedDelete = await apiRequest('/api/auth/delete-account', {
+      method: 'POST',
+      body: {
+        profileId: registerPayload.profile.id,
+        confirm: false,
+      },
+    })
+
+    expect(unconfirmedDelete.status).toBe(400)
+
+    const unauthorizedDelete = await apiRequest('/api/auth/delete-account', {
+      method: 'POST',
+      body: {
+        profileId: 'another-profile-id',
+        confirm: true,
+      },
+    })
+
+    expect(unauthorizedDelete.status).toBe(403)
+
+    sessionCookie = ''
+    const loginResponse = await apiRequest('/api/auth/login', {
+      method: 'POST',
+      body: {
+        username,
+        password: 'secret123',
+      },
+    })
+
+    expect(loginResponse.status).toBe(200)
   })
 
   it('permanently deletes the active profile and invalidates its session', async () => {

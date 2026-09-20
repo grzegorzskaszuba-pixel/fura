@@ -12,7 +12,7 @@ import {
   registerProfile,
   resetPassword,
 } from './auth-core.mjs'
-import { sendEmailVerificationEmail, sendPasswordChangedEmail, sendPasswordResetEmail, sendTestEmail } from './email-service.mjs'
+import { sendAccountDeletedEmail, sendEmailVerificationEmail, sendPasswordChangedEmail, sendPasswordResetEmail, sendTestEmail } from './email-service.mjs'
 import { createEmailVerificationToken, hashEmailVerificationToken, isEmailVerificationTokenUsable } from './email-verification.mjs'
 import { createPasswordResetToken, hashPasswordResetToken, isPasswordResetTokenUsable } from './password-reset.mjs'
 import { StorageError, initializeStorage, isPostgresStorage, postgresQuery, postgresTransaction, readState, writeState } from './storage.mjs'
@@ -163,6 +163,24 @@ async function notifyPasswordChanged(recipient) {
   } catch (error) {
     // eslint-disable-next-line no-console
     console.error('[auth-api] password changed email failed', error)
+  }
+}
+
+async function notifyAccountDeleted(recipient) {
+  if (!recipient) {
+    return
+  }
+
+  try {
+    const delivery = await sendAccountDeletedEmail(recipient)
+    // eslint-disable-next-line no-console
+    console.log('[auth-api] account deletion email accepted by Resend', {
+      recipient,
+      deliveryId: delivery?.id ?? null,
+    })
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('[auth-api] account deletion email failed', error)
   }
 }
 
@@ -2951,17 +2969,23 @@ async function handleAuthRequest(request, response) {
       return
     }
 
+    let accountEmail = ''
+
     if (isPostgresStorage()) {
-      await postgresTransaction(async (client) => {
+      accountEmail = await postgresTransaction(async (client) => {
+        const profileResult = await client.query('SELECT username FROM profiles WHERE id = $1 FOR UPDATE', [sessionProfileId])
         const deletedProfile = await client.query('DELETE FROM profiles WHERE id = $1 RETURNING id', [sessionProfileId])
 
         if (!deletedProfile.rows[0]) {
           throw new Error('Profil nie istnieje')
         }
+
+        return profileResult.rows[0]?.username ?? ''
       })
       cachedLegacyState = null
     } else {
       const state = await readState()
+      accountEmail = state.profiles.find((profile) => profile.id === sessionProfileId)?.username ?? ''
 
       if (!removeProfileData(state, sessionProfileId)) {
         setJson(response, 404, { message: 'Profil nie istnieje' })
@@ -2974,6 +2998,7 @@ async function handleAuthRequest(request, response) {
 
     invalidateProfileSessions(sessionProfileId)
     clearSessionCookie(response)
+    await notifyAccountDeleted(accountEmail)
     setJson(response, 200, { ok: true })
     return
   }

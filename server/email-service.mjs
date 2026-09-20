@@ -9,6 +9,7 @@ const TEST_SUBJECT = 'Testowy e-mail FURA'
 const VERIFICATION_SUBJECT = 'Potwierdź adres e-mail w FURA'
 const PASSWORD_RESET_SUBJECT = 'Reset hasła w FURA'
 const PASSWORD_CHANGED_SUBJECT = 'Hasło do konta FURA zostało zmienione'
+const ACCOUNT_DELETED_SUBJECT = 'Potwierdzenie usunięcia konta FURA'
 
 function getResendApiKey() {
   const apiKey = String(process.env.RESEND_API_KEY ?? '').trim()
@@ -130,6 +131,25 @@ export function sendPasswordChangedEmail(to) {
     subject: PASSWORD_CHANGED_SUBJECT,
     html: renderFuraEmailTemplate({
       preheader: 'Hasło do konta FURA zostało zmienione',
+      title,
+      intro,
+    }),
+    text: renderFuraEmailText({
+      title,
+      intro,
+    }),
+  })
+}
+
+export function sendAccountDeletedEmail(to) {
+  const title = 'Konto zostało usunięte'
+  const intro = 'Potwierdzamy, że Twoje konto FURA oraz zapisane dane zostały pomyślnie usunięte.'
+
+  return sendEmail({
+    to,
+    subject: ACCOUNT_DELETED_SUBJECT,
+    html: renderFuraEmailTemplate({
+      preheader: 'Potwierdzenie usunięcia konta FURA',
       title,
       intro,
     }),

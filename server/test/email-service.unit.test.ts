@@ -9,7 +9,7 @@ const { sendMock, ResendMock } = vi.hoisted(() => ({
 
 vi.mock('resend', () => ({ Resend: ResendMock }))
 
-import { sendEmailVerificationEmail, sendPasswordChangedEmail, sendPasswordResetEmail, sendTestEmail } from '../email-service.mjs'
+import { sendAccountDeletedEmail, sendEmailVerificationEmail, sendPasswordChangedEmail, sendPasswordResetEmail, sendTestEmail } from '../email-service.mjs'
 
 const originalApiKey = process.env.RESEND_API_KEY
 const originalWebBaseUrl = process.env.AUTH_WEB_BASE_URL
@@ -110,5 +110,22 @@ describe('email service', () => {
     expect(resetPayload.html).toContain('Ustaw nowe hasło')
     expect(changedPayload.subject).toBe('Hasło do konta FURA zostało zmienione')
     expect(changedPayload.text).toContain('Hasło do konta FURA zostało zmienione. Jeśli to nie Ty, skontaktuj się z nami.')
+  })
+
+  it('sends an account deletion confirmation', async () => {
+    process.env.RESEND_API_KEY = 'test-key'
+    sendMock.mockResolvedValue({ data: { id: 'account-deleted-email-id' }, error: null })
+
+    await expect(sendAccountDeletedEmail('driver@example.com')).resolves.toEqual({ id: 'account-deleted-email-id' })
+
+    const emailPayload = sendMock.mock.calls[0]?.[0] as { to: string; subject: string; html: string; text: string }
+
+    expect(emailPayload).toMatchObject({
+      to: 'driver@example.com',
+      subject: 'Potwierdzenie usunięcia konta FURA',
+      text: 'FURA\n\nKonto zostało usunięte\n\nPotwierdzamy, że Twoje konto FURA oraz zapisane dane zostały pomyślnie usunięte.\n\nFURA\nProsty dziennik serwisowy dla każdego auta.',
+    })
+    expect(emailPayload.html).toContain('Konto zostało usunięte')
+    expect(emailPayload.html).toContain('Potwierdzamy, że Twoje konto FURA oraz zapisane dane zostały pomyślnie usunięte.')
   })
 })
