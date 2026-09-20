@@ -55,6 +55,15 @@ export function ServiceEventDetail({ event, vehicle, open, onOpenChange, onEdit,
     setActiveAttachmentIndex(nextIndex)
   }
 
+  function handleDetailOpenChange(nextOpen: boolean) {
+    if (!nextOpen && viewerOpen) {
+      setViewerOpen(false)
+      return
+    }
+
+    onOpenChange(nextOpen)
+  }
+
   if (!event) {
     return null
   }
@@ -63,7 +72,7 @@ export function ServiceEventDetail({ event, vehicle, open, onOpenChange, onEdit,
     <>
       <ResponsiveModal
         open={open}
-        onOpenChange={onOpenChange}
+        onOpenChange={handleDetailOpenChange}
         title={event.title}
         description={serviceCategoryLabels[event.category]}
       >
@@ -190,7 +199,12 @@ export function ServiceEventDetail({ event, vehicle, open, onOpenChange, onEdit,
       </ResponsiveModal>
 
       {viewerOpen && activeAttachment ? (
-        <div className="fixed inset-0 z-[70] bg-black/80 p-4 sm:p-6" data-testid="attachment-lightbox" onClick={() => setViewerOpen(false)}>
+        <div
+          className="pointer-events-auto fixed inset-0 z-[70] bg-black/80 p-4 sm:p-6"
+          data-testid="attachment-lightbox"
+          onClick={() => setViewerOpen(false)}
+          style={{ pointerEvents: 'auto' }}
+        >
           <div className="relative mx-auto flex h-full max-w-5xl flex-col rounded-[32px] bg-zinc-950/95 p-4 text-white shadow-2xl sm:p-6" onClick={(viewerEvent) => viewerEvent.stopPropagation()}>
             <button
               type="button"
@@ -237,7 +251,7 @@ function AttachmentPreview({ attachment, compact = false, enlarged = false }: { 
       <img
         src={attachment.previewUrl}
         alt={attachment.name}
-        className={cn('h-full w-full bg-zinc-100 object-contain', compact ? 'p-1.5' : '', enlarged ? 'max-h-full' : '')}
+        className={cn('h-full w-full bg-zinc-100 object-contain', compact ? 'rounded-full p-1.5' : '', enlarged ? 'max-h-full' : '')}
       />
     )
   }
@@ -246,7 +260,7 @@ function AttachmentPreview({ attachment, compact = false, enlarged = false }: { 
   const extension = getAttachmentExtension(attachment.name)?.toUpperCase() ?? 'PLIK'
 
   return (
-    <div className={cn('flex h-full w-full flex-col items-center justify-center bg-gradient-to-br from-zinc-100 via-white to-zinc-200 text-zinc-700', compact ? 'p-3' : 'p-6')}>
+    <div className={cn('flex h-full w-full flex-col items-center justify-center bg-gradient-to-br from-zinc-100 via-white to-zinc-200 text-zinc-700', compact ? 'rounded-full p-3' : 'p-6')}>
       <div className={cn('flex items-center justify-center rounded-full bg-white/80 text-zinc-700 shadow-sm', compact ? 'h-10 w-10' : 'h-16 w-16')}>
         <Icon className={compact ? 'h-5 w-5' : 'h-8 w-8'} />
       </div>
