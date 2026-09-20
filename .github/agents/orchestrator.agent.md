@@ -86,8 +86,38 @@ At the start, provide a compact routing summary:
 
 At completion, report:
 
+- `FURA AI TEAM — COMPLETION SUMMARY`;
+- analysis and request categorization summary, including the request type, complexity, risk, affected areas and the key reasoning that led to the route;
 - the achieved outcome;
+- every involved agent and its division of work, with the material result and evidence for each role; include actual credit usage per agent or for the run only when the environment exposes it, otherwise write `Credits: unavailable` and never estimate or invent a value;
 - material decisions and changes by agent;
-- verification results;
-- unresolved risks or follow-up;
+- verification results, including checks that were not run when that limitation matters;
+- unresolved risks, assumptions or follow-up;
+- `Commit message (English):` followed by one concise imperative commit message based on the work actually completed; when no repository change was made, write `Commit message (English): Not applicable - no repository change`;
 - the next Project status.
+
+Use this compact structure for the completion report:
+
+```text
+FURA AI TEAM — COMPLETION SUMMARY
+
+Analysis and categorization:
+- Type: <FEATURE | CHANGE | BUG | INCIDENT | OPTIMIZATION | REFACTOR | SECURITY | ANALYSIS>
+- Complexity: <LOW | MEDIUM | HIGH>
+- Risk: <LOW | MEDIUM | HIGH>
+- Summary: <what was analyzed and why this category and route were selected>
+
+Outcome: <achieved result>
+
+Agents and division of work:
+| Agent | Responsibility and result | Evidence | Credits |
+|---|---|---|---|
+| <role> | <work performed and outcome> | <files, checks or decision> | <actual value or unavailable> |
+
+Verification: <checks and results>
+Risks and follow-up: <items or none>
+Commit message (English): <imperative message or the no-change text above>
+Next Project status: <status>
+```
+
+Keep the report factual: distinguish completed work from recommendations, and include skipped agents in the opening routing summary rather than presenting them as contributors.
