@@ -158,5 +158,7 @@ export interface ServiceAttachment {
   id: string
   name: string
   mimeType?: string
+  sizeBytes?: number
+  contentUrl?: string
   previewUrl?: string
 }

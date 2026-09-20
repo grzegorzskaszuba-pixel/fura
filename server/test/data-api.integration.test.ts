@@ -362,6 +362,79 @@ describe('data API integration', () => {
     expect(detailPayload.event.attachments?.[0]?.previewUrl).toBe(previewUrl)
   })
 
+  it('enforces attachment count and decoded content size limits', async () => {
+    const stamp = Date.now()
+    const cookie = await registerAndGetCookie(`attachment_limits_${stamp}`)
+
+    const createVehicle = await apiRequest('/api/vehicles', {
+      method: 'POST',
+      cookie,
+      body: {
+        name: 'Toyota Corolla',
+        make: 'Toyota',
+        model: 'Corolla',
+      },
+    })
+
+    expect(createVehicle.response.status).toBe(200)
+    const vehicle = (await createVehicle.response.json()) as { vehicle: { id: string } }
+    const allowedAttachments = Array.from({ length: 5 }, (_, index) => ({
+      id: `allowed-${index}`,
+      name: `plik-${index}.pdf`,
+      mimeType: 'application/pdf',
+    }))
+
+    const allowedResponse = await apiRequest('/api/service-events', {
+      method: 'POST',
+      cookie,
+      body: {
+        vehicleId: vehicle.vehicle.id,
+        status: 'completed',
+        category: 'documents',
+        title: 'Pięć załączników',
+        attachments: allowedAttachments,
+      },
+    })
+
+    expect(allowedResponse.response.status).toBe(200)
+
+    const tooManyResponse = await apiRequest('/api/service-events', {
+      method: 'POST',
+      cookie,
+      body: {
+        vehicleId: vehicle.vehicle.id,
+        status: 'completed',
+        category: 'documents',
+        title: 'Sześć załączników',
+        attachments: [...allowedAttachments, { id: 'too-many', name: 'plik-5.pdf', mimeType: 'application/pdf' }],
+      },
+    })
+
+    expect(tooManyResponse.response.status).toBe(400)
+
+    const oversizedPayloadLength = Math.ceil((20 * 1024 * 1024 + 1) / 3) * 4
+    const oversizedResponse = await apiRequest('/api/service-events', {
+      method: 'POST',
+      cookie,
+      body: {
+        vehicleId: vehicle.vehicle.id,
+        status: 'completed',
+        category: 'documents',
+        title: 'Za duży załącznik',
+        attachments: [
+          {
+            id: 'oversized',
+            name: 'duzy.bin',
+            mimeType: 'application/octet-stream',
+            contentUrl: `data:application/octet-stream;base64,${'a'.repeat(oversizedPayloadLength)}`,
+          },
+        ],
+      },
+    })
+
+    expect(oversizedResponse.response.status).toBe(400)
+  })
+
   it('creates 6h public share brochure link for own vehicle', async () => {
     const stamp = Date.now()
     const cookie = await registerAndGetCookie(`share_ok_${stamp}`)

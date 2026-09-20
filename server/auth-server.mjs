@@ -51,9 +51,9 @@ const startedAt = new Date().toISOString()
 let cachedLegacyState = null
 const SHARE_BROCHURE_TTL_MS = 6 * 60 * 60 * 1000
 const MAX_SHARED_HISTORY_ITEMS = 30
-const MAX_SERVICE_ATTACHMENTS = 10
-const MAX_SERVICE_ATTACHMENT_PREVIEW_LENGTH = 8 * 1024 * 1024
-const MAX_SERVICE_ATTACHMENT_PREVIEWS_LENGTH = 20 * 1024 * 1024
+const MAX_SERVICE_ATTACHMENTS = 5
+const MAX_SERVICE_ATTACHMENT_SIZE_BYTES = 20 * 1024 * 1024
+const MAX_JSON_BODY_BYTES = 32 * 1024 * 1024
 
 function isInputError(error) {
   if (!(error instanceof Error)) {
@@ -75,6 +75,7 @@ function isInputError(error) {
     normalized.includes('potwierdz') ||
     normalized.includes('weryfikacyj') ||
     normalized.includes('brak ') ||
+    normalized.includes('rozmiar') ||
     normalized.includes('musi miec co najmniej') ||
     normalized.includes('zalacznik') ||
     normalized.includes('nie istnieje')
@@ -206,8 +207,15 @@ function clearSessionCookie(response) {
 
 async function readJsonBody(request) {
   const chunks = []
+  let totalBytes = 0
 
   for await (const chunk of request) {
+    totalBytes += chunk.length
+
+    if (totalBytes > MAX_JSON_BODY_BYTES) {
+      throw new Error('Rozmiar danych żądania jest za duży')
+    }
+
     chunks.push(chunk)
   }
 
@@ -840,7 +848,7 @@ function normalizeServiceAttachments(value) {
     throw new Error(`Maksymalnie ${MAX_SERVICE_ATTACHMENTS} zalacznikow`)
   }
 
-  let previewLength = 0
+  let attachmentBytes = 0
   const attachments = value.map((attachment) => {
     if (!attachment || typeof attachment !== 'object') {
       throw new Error('Nieprawidlowy zalacznik')
@@ -852,29 +860,56 @@ function normalizeServiceAttachments(value) {
       throw new Error('Zalacznik musi miec nazwe')
     }
 
+    const contentUrl = normalizeOptionalString(attachment.contentUrl)
     const previewUrl = normalizeOptionalString(attachment.previewUrl)
+    const dataUrls = [contentUrl, previewUrl].filter((dataUrl, index, urls) => dataUrl && urls.indexOf(dataUrl) === index)
+    const sizeBytes = dataUrls.reduce((total, dataUrl) => total + getDataUrlSize(dataUrl), 0)
 
-    if (previewUrl) {
-      if (previewUrl.length > MAX_SERVICE_ATTACHMENT_PREVIEW_LENGTH) {
-        throw new Error('Zalacznik jest za duzy')
-      }
+    attachmentBytes += sizeBytes
 
-      previewLength += previewUrl.length
-
-      if (previewLength > MAX_SERVICE_ATTACHMENT_PREVIEWS_LENGTH) {
-        throw new Error('Laczny rozmiar zalacznikow jest za duzy')
-      }
+    if (attachmentBytes > MAX_SERVICE_ATTACHMENT_SIZE_BYTES) {
+      throw new Error('Laczny rozmiar zalacznikow jest za duzy')
     }
 
     return {
       id: normalizeOptionalString(attachment.id) ?? crypto.randomUUID(),
       name,
       mimeType: normalizeOptionalString(attachment.mimeType),
+      sizeBytes: sizeBytes > 0 ? sizeBytes : undefined,
+      contentUrl,
       previewUrl,
     }
   })
 
   return attachments.length > 0 ? attachments : undefined
+}
+
+function getDataUrlSize(dataUrl) {
+  const separatorIndex = dataUrl.indexOf(',')
+
+  if (!dataUrl.startsWith('data:') || separatorIndex < 0) {
+    throw new Error('Nieprawidlowy zalacznik')
+  }
+
+  const metadata = dataUrl.slice(5, separatorIndex).toLowerCase()
+  const payload = dataUrl.slice(separatorIndex + 1)
+
+  if (!metadata.includes(';base64')) {
+    try {
+      return Buffer.byteLength(decodeURIComponent(payload), 'utf8')
+    } catch {
+      throw new Error('Nieprawidlowy zalacznik')
+    }
+  }
+
+  const normalizedPayload = payload.replace(/\s/g, '')
+
+  if (normalizedPayload.length % 4 === 1 || !/^[A-Za-z0-9+/]*={0,2}$/.test(normalizedPayload)) {
+    throw new Error('Nieprawidlowy zalacznik')
+  }
+
+  const padding = normalizedPayload.endsWith('==') ? 2 : normalizedPayload.endsWith('=') ? 1 : 0
+  return Math.max(0, Math.floor(normalizedPayload.length * 3 / 4) - padding)
 }
 
 function sanitizeVehiclePayload(payload) {
@@ -921,9 +956,18 @@ function sanitizeServiceEventPayload(payload) {
   const category = String(payload.category ?? '').trim()
   const vehicleId = String(payload.vehicleId ?? '').trim()
   const attachments = normalizeServiceAttachments(payload.attachments)
-  const attachmentNames = Array.isArray(payload.attachmentNames)
-    ? payload.attachmentNames.filter((name) => typeof name === 'string').slice(0, MAX_SERVICE_ATTACHMENTS)
-    : attachments?.map((attachment) => attachment.name)
+  const rawAttachmentNames = Array.isArray(payload.attachmentNames) ? payload.attachmentNames.filter((name) => typeof name === 'string') : undefined
+
+  if (rawAttachmentNames && rawAttachmentNames.length > MAX_SERVICE_ATTACHMENTS) {
+    throw new Error(`Maksymalnie ${MAX_SERVICE_ATTACHMENTS} zalacznikow`)
+  }
+
+  const attachmentNames = rawAttachmentNames ?? attachments?.map((attachment) => attachment.name)
+  const attachmentCount = attachments?.length ?? normalizeOptionalNumber(payload.attachmentCount)
+
+  if (attachmentCount !== undefined && attachmentCount > MAX_SERVICE_ATTACHMENTS) {
+    throw new Error(`Maksymalnie ${MAX_SERVICE_ATTACHMENTS} zalacznikow`)
+  }
 
   if (!validStatuses.has(validStatus)) {
     throw new Error('Nieprawidlowy status wpisu')
@@ -950,7 +994,7 @@ function sanitizeServiceEventPayload(payload) {
     partsCost: normalizeOptionalNumber(payload.partsCost),
     laborCost: normalizeOptionalNumber(payload.laborCost),
     otherCost: normalizeOptionalNumber(payload.otherCost),
-    attachmentCount: attachments?.length ?? normalizeOptionalNumber(payload.attachmentCount),
+    attachmentCount,
     attachmentNames,
     attachments,
     isRecurring: typeof payload.isRecurring === 'boolean' ? payload.isRecurring : undefined,

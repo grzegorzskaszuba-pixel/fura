@@ -16,30 +16,17 @@ import {
 } from '@/shared/components/ui/select'
 import { Textarea } from '@/shared/components/ui/textarea'
 import { serviceCategoryOptions, serviceCategoryValues } from '@/shared/constants/service-categories'
-import { buildServiceAttachments, normalizeServiceAttachments } from '@/shared/lib/attachments'
+import {
+  buildServiceAttachments,
+  getServiceAttachmentSize,
+  MAX_SERVICE_ATTACHMENT_SIZE_BYTES,
+  MAX_SERVICE_ATTACHMENTS,
+  normalizeServiceAttachments,
+} from '@/shared/lib/attachments'
 import { getTodayIsoDate } from '@/shared/lib/utils'
 import type { ServiceAttachment, ServiceEvent, ServiceEventFormValues } from '@/shared/types/domain'
 import { WorkshopLocationField } from '@/features/service-events/workshop-location-field'
 
-const supportedAttachmentExtensions = ['txt', 'pdf', 'csv', 'xls', 'xlsx', 'doc', 'docx', 'rtf', 'odt', 'ods', 'xml', 'json', 'jpg', 'jpeg', 'png']
-const supportedAttachmentMimeTypes = [
-  'text/plain',
-  'application/pdf',
-  'text/csv',
-  'application/vnd.ms-excel',
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  'application/msword',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  'application/rtf',
-  'application/vnd.oasis.opendocument.text',
-  'application/vnd.oasis.opendocument.spreadsheet',
-  'application/xml',
-  'text/xml',
-  'application/json',
-  'image/jpeg',
-  'image/png',
-]
-const attachmentAcceptValue = 'image/jpeg,image/png,.jpg,.jpeg,.png,.txt,.pdf,.csv,.xls,.xlsx,.doc,.docx,.rtf,.odt,.ods,.xml,.json'
 const recurrenceUnitOptions = [
   { value: 'days', label: 'Dni' },
   { value: 'weeks', label: 'Tygodni' },
@@ -71,7 +58,7 @@ const serviceEventSchema = z.object({
       lng: z.number().finite(),
     })
     .optional(),
-  attachmentCount: z.number().int().min(0).optional(),
+  attachmentCount: z.number().int().min(0).max(MAX_SERVICE_ATTACHMENTS).optional(),
   isRecurring: z.boolean().optional(),
   recurrenceType: z.enum(['time', 'mileage']).optional(),
   recurrenceIntervalValue: z.number().int().min(1).optional(),
@@ -262,9 +249,19 @@ export function ServiceEventForm({
   async function handleSubmit(values: ServiceEventValues) {
     setSubmitError(null)
 
-    try {
-      const serializedAttachments = pendingAttachmentFiles.length > 0 ? await buildServiceAttachments(pendingAttachmentFiles) : attachments
+    let serializedAttachments: ServiceAttachment[]
 
+    try {
+      const savedAttachmentCount = Math.max(0, attachments.length - pendingAttachmentFiles.length)
+      const newAttachments = pendingAttachmentFiles.length > 0 ? await buildServiceAttachments(pendingAttachmentFiles) : []
+
+      serializedAttachments = [...attachments.slice(0, savedAttachmentCount), ...newAttachments]
+    } catch (error) {
+      setAttachmentError(error instanceof Error ? error.message : 'Nie udało się odczytać załącznika')
+      return
+    }
+
+    try {
       await onSubmit({
         ...values,
         isRecurring: values.status === 'planned' ? values.isRecurring : false,
@@ -327,22 +324,33 @@ export function ServiceEventForm({
       return
     }
 
-    if (files.some((file) => !isSupportedAttachmentFile(file))) {
-      setAttachmentError('Dodaj pliki tekstowe, PDF, Excel, CSV albo JPG, JPEG, PNG')
+    const nextAttachments = [
+      ...attachments,
+      ...files.map((file, index) => ({
+        id: `pending-attachment-${Date.now()}-${index}-${file.name}`,
+        name: file.name,
+        mimeType: file.type || undefined,
+        sizeBytes: file.size,
+      })),
+    ]
+    const totalSize = nextAttachments.reduce((sum, attachment) => sum + getServiceAttachmentSize(attachment), 0)
+
+    if (nextAttachments.length > MAX_SERVICE_ATTACHMENTS) {
+      setAttachmentError(`Możesz dodać maksymalnie ${MAX_SERVICE_ATTACHMENTS} załączników do jednego wpisu`)
       event.target.value = ''
       return
     }
 
-    setAttachments(
-      files.map((file, index) => ({
-        id: `pending-attachment-${index}-${file.name}`,
-        name: file.name,
-        mimeType: file.type || undefined,
-      })),
-    )
-    setPendingAttachmentFiles(files)
+    if (totalSize > MAX_SERVICE_ATTACHMENT_SIZE_BYTES) {
+      setAttachmentError('Łączny rozmiar załączników nie może przekroczyć 20 MB')
+      event.target.value = ''
+      return
+    }
+
+    setAttachments(nextAttachments)
+    setPendingAttachmentFiles((currentFiles) => [...currentFiles, ...files])
     setAttachmentError(null)
-    form.setValue('attachmentCount', files.length, { shouldDirty: true })
+    form.setValue('attachmentCount', nextAttachments.length, { shouldDirty: true })
     event.target.value = ''
   }
 
@@ -549,7 +557,6 @@ export function ServiceEventForm({
                 id="service-attachments"
                 type="file"
                 multiple
-                accept={attachmentAcceptValue}
                 className="sr-only"
                 onChange={handleAttachmentChange}
               />
@@ -609,16 +616,6 @@ export function ServiceEventForm({
       </form>
     </ResponsiveModal>
   )
-}
-
-function isSupportedAttachmentFile(file: File) {
-  const extension = file.name.split('.').pop()?.toLowerCase()
-
-  if (extension && supportedAttachmentExtensions.includes(extension)) {
-    return true
-  }
-
-  return supportedAttachmentMimeTypes.includes(file.type)
 }
 
 function formatAttachmentSummary(names: string[], count: number) {

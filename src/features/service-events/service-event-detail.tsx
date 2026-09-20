@@ -219,7 +219,7 @@ export function ServiceEventDetail({ event, vehicle, open, onOpenChange, onEdit,
               <p className="text-xs text-white/60">{attachments.length > 1 ? `${activeAttachmentIndex + 1} z ${attachments.length}` : 'Podgląd załącznika'}</p>
             </div>
             <div className="mt-4 flex flex-1 items-center justify-center overflow-hidden rounded-[28px] border border-white/10 bg-black/20">
-              <AttachmentPreview attachment={activeAttachment} enlarged />
+              <AttachmentPreview key={activeAttachment.id} attachment={activeAttachment} enlarged />
             </div>
             <div className="mt-4 flex items-center justify-between gap-3">
               {attachments.length > 1 ? (
@@ -246,12 +246,16 @@ export function ServiceEventDetail({ event, vehicle, open, onOpenChange, onEdit,
 }
 
 function AttachmentPreview({ attachment, compact = false, enlarged = false }: { attachment: ServiceAttachment; compact?: boolean; enlarged?: boolean }) {
-  if (attachment.previewUrl && isImageAttachment(attachment)) {
+  const [imageFailed, setImageFailed] = useState(false)
+  const imageUrl = attachment.previewUrl ?? (isImageAttachment(attachment) ? attachment.contentUrl : undefined)
+
+  if (imageUrl && isImageAttachment(attachment) && !imageFailed) {
     return (
       <img
-        src={attachment.previewUrl}
+        src={imageUrl}
         alt={attachment.name}
         className={cn('h-full w-full bg-zinc-100 object-cover', compact ? 'rounded-full' : '', enlarged ? 'max-h-full' : '')}
+        onError={() => setImageFailed(true)}
       />
     )
   }
@@ -264,8 +268,14 @@ function AttachmentPreview({ attachment, compact = false, enlarged = false }: { 
       <div className={cn('flex items-center justify-center rounded-full bg-white/80 text-zinc-700 shadow-sm', compact ? 'h-10 w-10' : 'h-16 w-16')}>
         <Icon className={compact ? 'h-5 w-5' : 'h-8 w-8'} />
       </div>
+      {!compact ? <p className="mt-3 text-sm font-medium text-zinc-600">Podgląd niedostępny</p> : null}
       {!compact ? <p className={cn('mt-3 max-w-full truncate font-semibold text-zinc-900', enlarged ? 'text-lg' : 'text-sm')}>{attachment.name}</p> : null}
       {!compact ? <p className="mt-1 text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500">{extension}</p> : null}
+      {!compact && attachment.contentUrl ? (
+        <a className="mt-3 text-sm font-semibold text-primary underline-offset-4 hover:underline" href={attachment.contentUrl} download={attachment.name}>
+          Pobierz plik
+        </a>
+      ) : null}
     </div>
   )
 }
