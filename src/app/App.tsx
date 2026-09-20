@@ -11,6 +11,8 @@ import { AuthScreen } from '@/features/auth/auth-screen'
 import { EmailVerificationPending } from '@/features/auth/email-verification-pending'
 import { EmailVerificationScreen } from '@/features/auth/email-verification-screen'
 import { PasswordResetScreen } from '@/features/auth/password-reset-screen'
+import { PrivacyPolicyPage } from '@/features/legal/privacy-policy-page'
+import { TermsOfServicePage } from '@/features/legal/terms-of-service-page'
 import { ProfileMenu } from '@/features/profile/profile-menu'
 import { ProfileSettingsModal } from '@/features/profile/profile-settings-modal'
 import { ServiceEventDetail } from '@/features/service-events/service-event-detail'
@@ -18,7 +20,6 @@ import { ServiceEventForm } from '@/features/service-events/service-event-form'
 import { ServiceEventList } from '@/features/service-events/service-event-list'
 import { ServiceSummary } from '@/features/service-events/service-summary'
 import { ShareBrochureModal } from '@/features/vehicles/share-brochure-modal'
-import { TermsOfServicePage } from '@/features/legal/terms-of-service-page'
 import { VehicleCarousel } from '@/features/vehicles/vehicle-carousel'
 import { VehicleForm } from '@/features/vehicles/vehicle-form'
 import { EmptyState } from '@/shared/components/empty-state'
@@ -50,6 +51,7 @@ function readPasswordResetToken() {
 
 export default function App() {
   const isTermsPage = typeof window !== 'undefined' && (window.location.pathname === '/regulamin' || window.location.pathname === '/regulamin/')
+  const isPrivacyPolicyPage = typeof window !== 'undefined' && (window.location.pathname === '/polityka-prywatnosci' || window.location.pathname === '/polityka-prywatnosci/')
   const [serviceTab, setServiceTab] = useState<ServiceTab>('history')
   const [activeVehicleId, setActiveVehicleId] = useState<string | null>(null)
   const [vehicleFormOpen, setVehicleFormOpen] = useState(false)
@@ -299,6 +301,10 @@ export default function App() {
       window.clearTimeout(timeoutId)
     }
   }, [shareExpiresAt])
+
+  if (isPrivacyPolicyPage) {
+    return <PrivacyPolicyPage />
+  }
 
   if (isTermsPage) {
     return <TermsOfServicePage />
