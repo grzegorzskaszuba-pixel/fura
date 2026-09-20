@@ -127,6 +127,7 @@ describe('Auth security regression', () => {
         username: userA,
         displayName: 'Secure A',
         password: 'old-pass-a',
+        termsAccepted: true,
       },
     })
 
@@ -138,6 +139,7 @@ describe('Auth security regression', () => {
         username: userB,
         displayName: 'Secure B',
         password: 'old-pass-b',
+        termsAccepted: true,
       },
     })
 
@@ -195,6 +197,7 @@ describe('Auth security regression', () => {
         username,
         displayName: 'Logout All',
         password: 'logout-pass-1',
+        termsAccepted: true,
       },
     })
     const firstSessionCookie = register.headers.get('set-cookie')?.split(';', 1)[0] ?? ''
@@ -256,6 +259,7 @@ describe('Auth security regression', () => {
         username: userA,
         displayName: 'Vehicle Owner',
         password: 'owner-pass-1',
+        termsAccepted: true,
       },
     })
     const cookieA = registerA.headers.get('set-cookie')?.split(';', 1)[0] ?? ''
@@ -269,6 +273,7 @@ describe('Auth security regression', () => {
         username: userB,
         displayName: 'Vehicle Intruder',
         password: 'intruder-pass-1',
+        termsAccepted: true,
       },
     })
     const cookieB = registerB.headers.get('set-cookie')?.split(';', 1)[0] ?? ''
@@ -321,6 +326,7 @@ describe('Auth security regression', () => {
         username: userA,
         displayName: 'Event Owner',
         password: 'owner-pass-2',
+        termsAccepted: true,
       },
     })
     const cookieA = registerA.headers.get('set-cookie')?.split(';', 1)[0] ?? ''
@@ -334,6 +340,7 @@ describe('Auth security regression', () => {
         username: userB,
         displayName: 'Event Intruder',
         password: 'intruder-pass-2',
+        termsAccepted: true,
       },
     })
     const cookieB = registerB.headers.get('set-cookie')?.split(';', 1)[0] ?? ''
@@ -399,6 +406,7 @@ describe('Auth security regression', () => {
         username: user,
         displayName: 'Tamper Test',
         password: 'tamper-pass-1',
+        termsAccepted: true,
       },
     })
     const cookie = register.headers.get('set-cookie')?.split(';', 1)[0] ?? ''
@@ -481,6 +489,7 @@ describe('Auth security regression', () => {
         username: user,
         displayName: 'Status Test',
         password: 'status-pass-1',
+        termsAccepted: true,
       },
     })
     const cookie = register.headers.get('set-cookie')?.split(';', 1)[0] ?? ''

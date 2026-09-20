@@ -293,7 +293,10 @@ async function initializeNormalizedPostgresStorage() {
         display_name TEXT NOT NULL,
         created_at TIMESTAMPTZ NOT NULL,
         updated_at TIMESTAMPTZ NOT NULL,
-        email_verified_at TIMESTAMPTZ
+        email_verified_at TIMESTAMPTZ,
+        terms_version TEXT,
+        terms_accepted_at TIMESTAMPTZ,
+        privacy_policy_version_presented TEXT
       )
     `)
 
@@ -312,6 +315,10 @@ async function initializeNormalizedPostgresStorage() {
       await pgPool.query('ALTER TABLE profiles ADD COLUMN email_verified_at TIMESTAMPTZ')
       await pgPool.query('UPDATE profiles SET email_verified_at = created_at WHERE email_verified_at IS NULL')
     }
+
+    await pgPool.query('ALTER TABLE profiles ADD COLUMN IF NOT EXISTS terms_version TEXT')
+    await pgPool.query('ALTER TABLE profiles ADD COLUMN IF NOT EXISTS terms_accepted_at TIMESTAMPTZ')
+    await pgPool.query('ALTER TABLE profiles ADD COLUMN IF NOT EXISTS privacy_policy_version_presented TEXT')
 
     await pgPool.query(`
       CREATE TABLE IF NOT EXISTS credentials (
@@ -422,9 +429,16 @@ async function initializeNormalizedPostgresStorage() {
         token_hash TEXT UNIQUE NOT NULL,
         expires_at TIMESTAMPTZ NOT NULL,
         created_at TIMESTAMPTZ NOT NULL,
-        used_at TIMESTAMPTZ
+        used_at TIMESTAMPTZ,
+        terms_version TEXT,
+        terms_accepted_at TIMESTAMPTZ,
+        privacy_policy_version_presented TEXT
       )
     `)
+
+    await pgPool.query('ALTER TABLE pending_email_registrations ADD COLUMN IF NOT EXISTS terms_version TEXT')
+    await pgPool.query('ALTER TABLE pending_email_registrations ADD COLUMN IF NOT EXISTS terms_accepted_at TIMESTAMPTZ')
+    await pgPool.query('ALTER TABLE pending_email_registrations ADD COLUMN IF NOT EXISTS privacy_policy_version_presented TEXT')
 
     await pgPool.query('CREATE INDEX IF NOT EXISTS pending_email_registrations_expires_idx ON pending_email_registrations (expires_at)')
 
@@ -528,7 +542,8 @@ async function initializeNormalizedPostgresStorage() {
       legacyState.credentials.length === 0 &&
       legacyState.vehicles.length === 0 &&
       legacyState.serviceEvents.length === 0 &&
-      legacyState.shareBrochures.length === 0
+      legacyState.shareBrochures.length === 0 &&
+      legacyState.pendingEmailRegistrations.length === 0
     ) {
       return
     }
@@ -541,11 +556,52 @@ async function initializeNormalizedPostgresStorage() {
       for (const profile of legacyState.profiles) {
         await client.query(
           `
-            INSERT INTO profiles (id, username, display_name, created_at, updated_at, email_verified_at)
-            VALUES ($1, $2, $3, $4, $5, $6)
+            INSERT INTO profiles (
+              id, username, display_name, created_at, updated_at, email_verified_at,
+              terms_version, terms_accepted_at, privacy_policy_version_presented
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
             ON CONFLICT (id) DO NOTHING
           `,
-          [profile.id, profile.username, profile.displayName, profile.createdAt, profile.updatedAt, profile.createdAt],
+          [
+            profile.id,
+            profile.username,
+            profile.displayName,
+            profile.createdAt,
+            profile.updatedAt,
+            profile.createdAt,
+            profile.termsVersion ?? null,
+            profile.termsAcceptedAt ?? null,
+            profile.privacyPolicyVersionPresented ?? null,
+          ],
+        )
+      }
+
+      for (const pending of legacyState.pendingEmailRegistrations ?? []) {
+        await client.query(
+          `
+            INSERT INTO pending_email_registrations (
+              id, username, display_name, password_hash, password_salt,
+              token_hash, expires_at, created_at, used_at,
+              terms_version, terms_accepted_at, privacy_policy_version_presented
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+            ON CONFLICT (id) DO NOTHING
+          `,
+          [
+            pending.id,
+            pending.username,
+            pending.displayName,
+            pending.passwordHash,
+            pending.passwordSalt,
+            pending.tokenHash,
+            pending.expiresAt,
+            pending.createdAt,
+            pending.usedAt ?? null,
+            pending.termsVersion ?? null,
+            pending.termsAcceptedAt ?? null,
+            pending.privacyPolicyVersionPresented ?? null,
+          ],
         )
       }
 

@@ -41,9 +41,13 @@ describe('auth-core unit', () => {
       username: 'DriverOne@example.com',
       displayName: 'Driver One',
       password: 'secret123',
+      termsAccepted: true,
     })
 
     expect(profile.username).toBe('driverone@example.com')
+    expect(profile.termsVersion).toBe('2026-09-20')
+    expect(profile.termsAcceptedAt).toEqual(expect.any(String))
+    expect(profile.privacyPolicyVersionPresented).toBe('2026-09-20')
     expect(state.profiles).toHaveLength(1)
     expect(state.credentials).toHaveLength(1)
 
@@ -55,6 +59,19 @@ describe('auth-core unit', () => {
     expect(loggedIn.id).toBe(profile.id)
   })
 
+  it('requires terms acceptance during registration', () => {
+    const state = createState()
+
+    expect(() =>
+      registerProfile(state, {
+        username: 'without-terms@example.com',
+        displayName: 'Without Terms',
+        password: 'secret123',
+        termsAccepted: false,
+      }),
+    ).toThrow('Zaakceptuj Regulamin FURA')
+  })
+
   it('changes password only with valid current password', () => {
     const state = createState()
 
@@ -62,6 +79,7 @@ describe('auth-core unit', () => {
       username: 'owner@example.com',
       displayName: 'Owner',
       password: 'old-pass-1',
+      termsAccepted: true,
     })
 
     expect(() =>
@@ -100,6 +118,7 @@ describe('auth-core unit', () => {
       username: 'recoverable@example.com',
       displayName: 'Recoverable',
       password: 'start-pass-1',
+      termsAccepted: true,
     })
 
     resetPassword(state, {
@@ -121,6 +140,7 @@ describe('auth-core unit', () => {
       username: 'legacy@example.com',
       displayName: 'Legacy User',
       password: 'legacy-pass-1',
+      termsAccepted: true,
     })
     const credential = state.credentials[0]
     const originalHash = credential.passwordHash
@@ -143,6 +163,7 @@ describe('auth-core unit', () => {
       username: 'bigdaddysatan@gmail.com',
       displayName: 'Big Daddy Satan',
       password: 'legacy-pass-2',
+      termsAccepted: true,
     })
     const credential = state.credentials[0]
     const originalHash = credential.passwordHash
@@ -168,6 +189,7 @@ describe('auth-core unit', () => {
         username: 'legacy-user',
         displayName: 'Legacy User',
         password: 'secret123',
+        termsAccepted: true,
       }),
     ).toThrow('Podaj prawidłowy adres e-mail')
   })
@@ -180,6 +202,7 @@ describe('auth-core unit', () => {
       username: 'deletable@example.com',
       displayName: 'Deletable User',
       password: 'secret123',
+      termsAccepted: true,
     })
 
     state.vehicles.push({ profileId: profile.id })

@@ -3,6 +3,7 @@ import { accountRepository } from '@/data/repositories/account-repository'
 import { authCredentialRepository } from '@/data/repositories/auth-credential-repository'
 import { initializeDatabase } from '@/data/database/db'
 import { profileRepository } from '@/data/repositories/profile-repository'
+import { LEGAL_DOCUMENTS } from '@/shared/constants/legal-documents'
 import type { AuthService, RegistrationProfile } from '@/features/auth/auth-service'
 import { createPasswordHash, verifyPassword } from '@/shared/lib/password'
 import type { LoginCredentials, RegisterCredentials } from '@/shared/types/domain'
@@ -65,6 +66,10 @@ export class AppAuthService implements AuthService {
     const normalizedUsername = input.username.trim().toLowerCase()
     const displayName = input.displayName?.trim() ?? ''
 
+    if (input.termsAccepted !== true) {
+      throw new Error('Zaakceptuj Regulamin FURA, aby utworzyć profil')
+    }
+
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedUsername)) {
       throw new Error('Podaj prawidłowy adres e-mail')
     }
@@ -82,6 +87,9 @@ export class AppAuthService implements AuthService {
     const profile = await profileRepository.create({
       username: normalizedUsername,
       displayName,
+      termsVersion: LEGAL_DOCUMENTS.terms.version,
+      termsAcceptedAt: new Date().toISOString(),
+      privacyPolicyVersionPresented: LEGAL_DOCUMENTS.privacyPolicy.version,
     })
     const passwordData = await createPasswordHash(input.password)
     const now = new Date().toISOString()

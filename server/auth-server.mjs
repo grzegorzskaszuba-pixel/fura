@@ -73,6 +73,7 @@ function isInputError(error) {
     normalized.includes('taki profil juz istnieje') ||
     normalized.includes('profil nie istnieje') ||
     normalized.includes('potwierdz') ||
+    normalized.includes('zaakceptuj') ||
     normalized.includes('weryfikacyj') ||
     normalized.includes('brak ') ||
     normalized.includes('rozmiar') ||
@@ -374,6 +375,9 @@ function sanitizeProfile(profile) {
     displayName: profile.displayName,
     createdAt: profile.createdAt,
     updatedAt: profile.updatedAt,
+    termsVersion: profile.termsVersion,
+    termsAcceptedAt: profile.termsAcceptedAt,
+    privacyPolicyVersionPresented: profile.privacyPolicyVersionPresented,
   }
 }
 
@@ -793,6 +797,9 @@ function mapProfileRow(row) {
     displayName: row.display_name,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    termsVersion: row.terms_version ?? undefined,
+    termsAcceptedAt: row.terms_accepted_at ?? undefined,
+    privacyPolicyVersionPresented: row.privacy_policy_version_presented ?? undefined,
   }
 }
 
@@ -1226,7 +1233,7 @@ async function handleAuthRequest(request, response) {
 
     if (isPostgresStorage()) {
       const result = await postgresQuery(
-        'SELECT id, username, display_name, created_at, updated_at FROM profiles WHERE id = $1 LIMIT 1',
+        'SELECT id, username, display_name, created_at, updated_at, terms_version, terms_accepted_at, privacy_policy_version_presented FROM profiles WHERE id = $1 LIMIT 1',
         [profileId],
       )
 
@@ -1283,7 +1290,7 @@ async function handleAuthRequest(request, response) {
           UPDATE profiles
           SET display_name = $1, updated_at = $2
           WHERE id = $3
-          RETURNING id, username, display_name, created_at, updated_at
+          RETURNING id, username, display_name, created_at, updated_at, terms_version, terms_accepted_at, privacy_policy_version_presented
         `,
         [displayName, updatedAt, profileId],
       )
@@ -2220,7 +2227,8 @@ async function handleAuthRequest(request, response) {
       const profileId = await postgresTransaction(async (client) => {
         const pendingResult = await client.query(
           `
-            SELECT id, username, display_name, password_hash, password_salt, created_at
+            SELECT id, username, display_name, password_hash, password_salt, created_at,
+              terms_version, terms_accepted_at, privacy_policy_version_presented
             FROM pending_email_registrations
             WHERE token_hash = $1
               AND used_at IS NULL
@@ -2236,10 +2244,23 @@ async function handleAuthRequest(request, response) {
 
           await client.query(
             `
-              INSERT INTO profiles (id, username, display_name, created_at, updated_at, email_verified_at)
-              VALUES ($1, $2, $3, $4, $5, $6)
+              INSERT INTO profiles (
+                id, username, display_name, created_at, updated_at, email_verified_at,
+                terms_version, terms_accepted_at, privacy_policy_version_presented
+              )
+              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
             `,
-            [pending.id, pending.username, pending.display_name, pending.created_at, verifiedAt, verifiedAt],
+            [
+              pending.id,
+              pending.username,
+              pending.display_name,
+              pending.created_at,
+              verifiedAt,
+              verifiedAt,
+              pending.terms_version,
+              pending.terms_accepted_at,
+              pending.privacy_policy_version_presented,
+            ],
           )
           await client.query(
             `
@@ -2301,6 +2322,9 @@ async function handleAuthRequest(request, response) {
         createdAt: pending.createdAt,
         updatedAt: verifiedAt,
         emailVerifiedAt: verifiedAt,
+        termsVersion: pending.termsVersion,
+        termsAcceptedAt: pending.termsAcceptedAt,
+        privacyPolicyVersionPresented: pending.privacyPolicyVersionPresented,
       })
       state.credentials.push({
         profileId: pending.id,
@@ -2460,18 +2484,16 @@ async function handleAuthRequest(request, response) {
           return
         }
 
-        const delivery = await sendEmailVerificationEmail(profile.username, emailVerification.token)
-        logVerificationDelivery(profile.username, delivery)
-
         try {
           await postgresTransaction(async (client) => {
             await client.query(
               `
                 INSERT INTO pending_email_registrations (
                   id, username, display_name, password_hash, password_salt,
-                  token_hash, expires_at, created_at
+                  token_hash, expires_at, created_at,
+                  terms_version, terms_accepted_at, privacy_policy_version_presented
                 )
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
               `,
               [
                 profile.id,
@@ -2482,6 +2504,9 @@ async function handleAuthRequest(request, response) {
                 emailVerification.record.tokenHash,
                 emailVerification.record.expiresAt,
                 emailVerification.record.createdAt,
+                localState.profiles[0].termsVersion,
+                localState.profiles[0].termsAcceptedAt,
+                localState.profiles[0].privacyPolicyVersionPresented,
               ],
             )
           })
@@ -2496,6 +2521,9 @@ async function handleAuthRequest(request, response) {
           throw error
         }
 
+        const delivery = await sendEmailVerificationEmail(profile.username, emailVerification.token)
+        logVerificationDelivery(profile.username, delivery)
+
         setJson(response, 200, { profile: sanitizeProfile(profile), verificationRequired: true })
         return
       }
@@ -2503,8 +2531,24 @@ async function handleAuthRequest(request, response) {
       try {
         await postgresTransaction(async (client) => {
           await client.query(
-            'INSERT INTO profiles (id, username, display_name, created_at, updated_at, email_verified_at) VALUES ($1, $2, $3, $4, $5, $6)',
-            [profile.id, profile.username, profile.displayName, profile.createdAt, profile.updatedAt, emailVerification ? null : profile.createdAt],
+            `
+              INSERT INTO profiles (
+                id, username, display_name, created_at, updated_at, email_verified_at,
+                terms_version, terms_accepted_at, privacy_policy_version_presented
+              )
+              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            `,
+            [
+              profile.id,
+              profile.username,
+              profile.displayName,
+              profile.createdAt,
+              profile.updatedAt,
+              emailVerification ? null : profile.createdAt,
+              localState.profiles[0].termsVersion,
+              localState.profiles[0].termsAcceptedAt,
+              localState.profiles[0].privacyPolicyVersionPresented,
+            ],
           )
           await client.query(
             'INSERT INTO credentials (profile_id, username, password_hash, password_salt, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6)',
@@ -2564,6 +2608,9 @@ async function handleAuthRequest(request, response) {
         expiresAt: emailVerification.record.expiresAt,
         createdAt: emailVerification.record.createdAt,
         usedAt: null,
+        termsVersion: storedProfile.termsVersion,
+        termsAcceptedAt: storedProfile.termsAcceptedAt,
+        privacyPolicyVersionPresented: storedProfile.privacyPolicyVersionPresented,
       })
       await writeState(state)
       setJson(response, 200, { profile: sanitizeProfile(profile), verificationRequired: true })
@@ -2595,6 +2642,9 @@ async function handleAuthRequest(request, response) {
             p.created_at,
             p.updated_at,
             p.email_verified_at,
+            p.terms_version,
+            p.terms_accepted_at,
+            p.privacy_policy_version_presented,
             c.profile_id,
             c.password_hash,
             c.password_salt,
@@ -2662,6 +2712,9 @@ async function handleAuthRequest(request, response) {
                   p.created_at,
                   p.updated_at,
                   p.email_verified_at,
+                  p.terms_version,
+                  p.terms_accepted_at,
+                  p.privacy_policy_version_presented,
                   c.profile_id,
                   c.password_hash,
                   c.password_salt,
@@ -2683,7 +2736,7 @@ async function handleAuthRequest(request, response) {
       }
 
       if (!row) {
-        const pendingResult = await postgresQuery('SELECT id FROM pending_email_registrations WHERE username = $1 LIMIT 1', [username])
+        const pendingResult = await postgresQuery('SELECT id FROM pending_email_registrations WHERE username = ANY($1::text[]) LIMIT 1', [getLoginCandidates(username)])
 
         if (pendingResult.rows[0]) {
           setJson(response, 403, { message: 'Potwierdź adres e-mail przed zalogowaniem' })
@@ -2708,6 +2761,9 @@ async function handleAuthRequest(request, response) {
             createdAt: row.created_at,
             updatedAt: row.updated_at,
             emailVerifiedAt: row.email_verified_at,
+            termsVersion: row.terms_version,
+            termsAcceptedAt: row.terms_accepted_at,
+            privacyPolicyVersionPresented: row.privacy_policy_version_presented,
           },
         ],
         credentials: [

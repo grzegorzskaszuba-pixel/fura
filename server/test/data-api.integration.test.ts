@@ -94,6 +94,7 @@ describe('data API integration', () => {
         username: email,
         displayName: username,
         password: 'secret123',
+        termsAccepted: true,
       },
     })
 
@@ -581,6 +582,7 @@ describe('data API integration', () => {
         username: `account_delete_a_${stamp}@example.com`,
         displayName: 'Account Delete A',
         password: 'secret123',
+        termsAccepted: true,
       },
     })
     const registerAPayload = (await registerA.response.json()) as { profile: { id: string } }
@@ -591,6 +593,7 @@ describe('data API integration', () => {
         username: `account_delete_b_${stamp}@example.com`,
         displayName: 'Account Delete B',
         password: 'secret123',
+        termsAccepted: true,
       },
     })
     const cookieB = registerB.nextCookie as string

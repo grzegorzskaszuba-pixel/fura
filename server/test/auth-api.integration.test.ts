@@ -59,6 +59,7 @@ describe('auth API integration', () => {
   let apiProcess: ChildProcessWithoutNullStreams | null = null
   let baseUrl = ''
   let tempDir = ''
+  let dbFile = ''
   let sessionCookie = ''
 
   async function apiRequest(pathname: string, options?: { method?: string; body?: unknown; origin?: string }) {
@@ -91,7 +92,7 @@ describe('auth API integration', () => {
 
   beforeAll(async () => {
     tempDir = await mkdtemp(path.join(os.tmpdir(), 'carlog-auth-api-'))
-    const dbFile = path.join(tempDir, 'auth-db.json')
+    dbFile = path.join(tempDir, 'auth-db.json')
     const legacySalt = 'legacy-salt-for-api-test'
     const legacyPasswordHash = crypto.scryptSync('legacy-pass-1', legacySalt, 64).toString('hex')
 
@@ -170,6 +171,7 @@ describe('auth API integration', () => {
         username: `user_${stamp}_a@example.com`,
         displayName: 'User A',
         password: 'secret123',
+        termsAccepted: true,
       },
     })
 
@@ -179,6 +181,7 @@ describe('auth API integration', () => {
         username: `user_${stamp}_b@example.com`,
         displayName: 'User B',
         password: 'secret123',
+        termsAccepted: true,
       },
     })
 
@@ -220,6 +223,7 @@ describe('auth API integration', () => {
         username: gmailUsername,
         displayName: 'Big Daddy Satan',
         password: 'legacy-pass-2',
+        termsAccepted: true,
       },
     })
 
@@ -248,10 +252,72 @@ describe('auth API integration', () => {
         username: 'legacy-user',
         displayName: 'Legacy User',
         password: 'secret123',
+        termsAccepted: true,
       },
     })
 
     expect(response.status).toBe(400)
+  })
+
+  it('requires terms acceptance, persists legal metadata and does not ask again at login', async () => {
+    sessionCookie = ''
+    const stamp = Date.now()
+    const username = `legal_${stamp}@example.com`
+
+    const rejected = await apiRequest('/api/auth/register', {
+      method: 'POST',
+      body: {
+        username,
+        displayName: 'Legal User',
+        password: 'secret123',
+      },
+    })
+
+    expect(rejected.status).toBe(400)
+
+    const registered = await apiRequest('/api/auth/register', {
+      method: 'POST',
+      body: {
+        username,
+        displayName: 'Legal User',
+        password: 'secret123',
+        termsAccepted: true,
+      },
+    })
+    const registeredPayload = (await registered.json()) as {
+      profile: {
+        termsVersion?: string
+        termsAcceptedAt?: string
+        privacyPolicyVersionPresented?: string
+      }
+    }
+
+    expect(registered.status).toBe(200)
+    expect(registeredPayload.profile.termsVersion).toBe('2026-09-20')
+    expect(registeredPayload.profile.termsAcceptedAt).toEqual(expect.any(String))
+    expect(registeredPayload.profile.privacyPolicyVersionPresented).toBe('2026-09-20')
+
+    const storedState = JSON.parse(await readFile(dbFile, 'utf8')) as {
+      profiles: Array<{
+        username: string
+        termsVersion?: string
+        termsAcceptedAt?: string
+        privacyPolicyVersionPresented?: string
+      }>
+    }
+    const storedProfile = storedState.profiles.find((profile) => profile.username === username)
+
+    expect(storedProfile?.termsVersion).toBe('2026-09-20')
+    expect(storedProfile?.termsAcceptedAt).toEqual(expect.any(String))
+    expect(storedProfile?.privacyPolicyVersionPresented).toBe('2026-09-20')
+
+    sessionCookie = ''
+    const login = await apiRequest('/api/auth/login', {
+      method: 'POST',
+      body: { username, password: 'secret123' },
+    })
+
+    expect(login.status).toBe(200)
   })
 
   it('rejects reset-password without active session', async () => {
@@ -298,6 +364,7 @@ describe('auth API integration', () => {
         username,
         displayName: 'Failed Delete',
         password: 'secret123',
+        termsAccepted: true,
       },
     })
     const registerPayload = (await registerResponse.json()) as { profile: { id: string } }
@@ -346,6 +413,7 @@ describe('auth API integration', () => {
         username: `keep_${stamp}@example.com`,
         displayName: 'Keep User',
         password: 'secret123',
+        termsAccepted: true,
       },
     })
     const keepPayload = (await keepResponse.json()) as { profile: { id: string } }
@@ -358,6 +426,7 @@ describe('auth API integration', () => {
         username: `delete_${stamp}@example.com`,
         displayName: 'Delete User',
         password: 'secret123',
+        termsAccepted: true,
       },
     })
     const deletePayload = (await deleteResponse.json()) as { profile: { id: string } }

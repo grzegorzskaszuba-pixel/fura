@@ -6,6 +6,7 @@ import { z } from 'zod'
 
 import { Button } from '@/shared/components/ui/button'
 import { BrandLogo } from '@/shared/components/brand-logo'
+import { LEGAL_DOCUMENTS } from '@/shared/constants/legal-documents'
 import { Card, CardContent } from '@/shared/components/ui/card'
 import { Input } from '@/shared/components/ui/input'
 import { Label } from '@/shared/components/ui/label'
@@ -15,6 +16,7 @@ const authSchema = z.object({
   username: z.string().trim().email('Podaj prawidłowy adres e-mail'),
   password: z.string().min(6, 'Hasło musi mieć co najmniej 6 znaków'),
   displayName: z.string().trim().optional(),
+  termsAccepted: z.boolean(),
 })
 
 const passwordResetRequestSchema = z.object({
@@ -48,6 +50,7 @@ export function AuthScreen({ onLogin, onRegister, onRequestPasswordReset, allowR
       username: '',
       password: '',
       displayName: '',
+      termsAccepted: false,
     },
   })
 
@@ -71,7 +74,12 @@ export function AuthScreen({ onLogin, onRegister, onRequestPasswordReset, allowR
           return
         }
 
-        await onRegister({ username: values.username, password: values.password, displayName: values.displayName })
+        if (!values.termsAccepted) {
+          form.setError('termsAccepted', { type: 'manual', message: 'Zaakceptuj Regulamin FURA' })
+          return
+        }
+
+        await onRegister({ username: values.username, password: values.password, displayName: values.displayName, termsAccepted: true })
       }
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : 'Nie udało się wykonać operacji')
@@ -107,7 +115,7 @@ export function AuthScreen({ onLogin, onRegister, onRequestPasswordReset, allowR
   }
 
   return (
-    <main className="mx-auto flex min-h-svh w-full max-w-xl items-center px-4 py-6 sm:px-6">
+    <main className="mx-auto flex min-h-svh w-full max-w-xl flex-col items-center justify-center px-4 py-6 sm:px-6">
       <Card className="w-full bg-white/92">
         <CardContent className="p-6 sm:p-8 lg:p-10">
           <div className="mx-auto max-w-md space-y-7">
@@ -122,6 +130,7 @@ export function AuthScreen({ onLogin, onRegister, onRequestPasswordReset, allowR
                 <button
                   type="button"
                   disabled={isSubmitting}
+                  aria-pressed={mode === 'login'}
                   className={`rounded-[14px] px-4 py-3 text-sm font-medium transition ${mode === 'login' ? 'bg-white text-zinc-950 shadow-sm' : 'text-zinc-500'}`}
                   onClick={() => setMode('login')}
                 >
@@ -130,6 +139,7 @@ export function AuthScreen({ onLogin, onRegister, onRequestPasswordReset, allowR
                 <button
                   type="button"
                   disabled={isSubmitting}
+                  aria-pressed={mode === 'register'}
                   className={`rounded-[14px] px-4 py-3 text-sm font-medium transition ${mode === 'register' ? 'bg-white text-zinc-950 shadow-sm' : 'text-zinc-500'}`}
                   onClick={() => setMode('register')}
                 >
@@ -189,6 +199,21 @@ export function AuthScreen({ onLogin, onRegister, onRequestPasswordReset, allowR
                     </div>
                   ) : null}
 
+                  {mode === 'register' ? (
+                    <div className="space-y-2 rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-3">
+                      <label className="flex items-start gap-3 text-sm leading-6 text-zinc-700" htmlFor="terms-accepted">
+                        <input id="terms-accepted" type="checkbox" className="mt-1 h-4 w-4 shrink-0 accent-zinc-950" disabled={isSubmitting} {...form.register('termsAccepted')} />
+                        <span>
+                          Akceptuję{' '}
+                          <a className="font-medium text-zinc-950 underline underline-offset-4" href={LEGAL_DOCUMENTS.terms.href} target="_blank" rel="noreferrer">
+                            Regulamin FURA
+                          </a>
+                        </span>
+                      </label>
+                      {form.formState.errors.termsAccepted ? <p className="text-sm text-red-600">{form.formState.errors.termsAccepted.message}</p> : null}
+                    </div>
+                  ) : null}
+
                   {error ? <p className="text-sm text-red-600">{error}</p> : null}
 
                   <div className="flex flex-col gap-[22px] pt-2">
@@ -208,6 +233,20 @@ export function AuthScreen({ onLogin, onRegister, onRequestPasswordReset, allowR
           </div>
         </CardContent>
       </Card>
+      <nav aria-label="Dokumenty i kontakt" className="mt-5 flex flex-wrap justify-center gap-x-4 gap-y-2 px-3 text-xs text-zinc-600">
+        <a href={LEGAL_DOCUMENTS.terms.href} target="_blank" rel="noreferrer" className="underline-offset-4 hover:text-zinc-950 hover:underline">
+          Regulamin
+        </a>
+        <a href={LEGAL_DOCUMENTS.privacyPolicy.href} target="_blank" rel="noreferrer" className="underline-offset-4 hover:text-zinc-950 hover:underline">
+          Polityka prywatności
+        </a>
+        <a href={LEGAL_DOCUMENTS.security.href} target="_blank" rel="noreferrer" className="underline-offset-4 hover:text-zinc-950 hover:underline">
+          Bezpieczeństwo
+        </a>
+        <a href={LEGAL_DOCUMENTS.contact.href} className="underline-offset-4 hover:text-zinc-950 hover:underline">
+          Kontakt
+        </a>
+      </nav>
     </main>
   )
 }

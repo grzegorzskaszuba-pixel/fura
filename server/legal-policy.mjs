@@ -1,0 +1,2 @@
+export const TERMS_VERSION = '2026-09-20'
+export const PRIVACY_POLICY_VERSION = '2026-09-20'

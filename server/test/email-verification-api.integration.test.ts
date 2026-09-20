@@ -1,7 +1,7 @@
 // @vitest-environment node
 
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import crypto from 'node:crypto'
 import net from 'node:net'
 import os from 'node:os'
@@ -61,6 +61,7 @@ describe('email verification API integration', () => {
   let apiProcess: ChildProcessWithoutNullStreams | null = null
   let baseUrl = ''
   let tempDir = ''
+  let dbFile = ''
 
   async function apiRequest(pathname: string, body: unknown) {
     return fetch(`${baseUrl}${pathname}`, {
@@ -72,7 +73,7 @@ describe('email verification API integration', () => {
 
   beforeAll(async () => {
     tempDir = await mkdtemp(path.join(os.tmpdir(), 'carlog-email-verification-'))
-    const dbFile = path.join(tempDir, 'auth-db.json')
+    dbFile = path.join(tempDir, 'auth-db.json')
     const profileId = 'verification-profile'
     const token = 'verification-token'
     const salt = 'verification-salt'
@@ -130,6 +131,9 @@ describe('email verification API integration', () => {
             expiresAt: tokenExpiresAt,
             createdAt: '2026-09-18T00:00:00.000Z',
             usedAt: null,
+            termsVersion: '2026-09-20',
+            termsAcceptedAt: '2026-09-18T00:00:00.000Z',
+            privacyPolicyVersionPresented: '2026-09-20',
           },
         ],
       }),
@@ -199,6 +203,20 @@ describe('email verification API integration', () => {
     const verification = await apiRequest('/api/auth/verify-email', { token: 'pending-token' })
     expect(verification.status).toBe(200)
 
+    const storedState = JSON.parse(await readFile(dbFile, 'utf8')) as {
+      profiles: Array<{
+        username: string
+        termsVersion?: string
+        termsAcceptedAt?: string
+        privacyPolicyVersionPresented?: string
+      }>
+    }
+    const storedProfile = storedState.profiles.find((profile) => profile.username === 'pending@example.com')
+
+    expect(storedProfile?.termsVersion).toBe('2026-09-20')
+    expect(storedProfile?.termsAcceptedAt).toBe('2026-09-18T00:00:00.000Z')
+    expect(storedProfile?.privacyPolicyVersionPresented).toBe('2026-09-20')
+
     const login = await apiRequest('/api/auth/login', {
       username: 'pending@example.com',
       password: 'secret123',
@@ -213,6 +231,7 @@ describe('email verification API integration', () => {
       username,
       displayName: 'Email Failure',
       password: 'secret123',
+      termsAccepted: true,
     })
 
     expect(register.status).toBe(500)

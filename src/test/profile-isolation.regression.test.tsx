@@ -13,6 +13,7 @@ describe('Profile isolation regression', () => {
       username: secondaryUsername,
       displayName: 'Other Profile',
       password: 'haslo123',
+      termsAccepted: true,
     })
 
     await appAuthService.login({

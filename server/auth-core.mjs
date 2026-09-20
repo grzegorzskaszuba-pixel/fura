@@ -1,5 +1,7 @@
 import crypto from 'node:crypto'
 
+import { PRIVACY_POLICY_VERSION, TERMS_VERSION } from './legal-policy.mjs'
+
 function createId() {
   return crypto.randomUUID()
 }
@@ -89,6 +91,9 @@ function sanitizeProfile(profile) {
     displayName: profile.displayName,
     createdAt: profile.createdAt,
     updatedAt: profile.updatedAt,
+    termsVersion: profile.termsVersion,
+    termsAcceptedAt: profile.termsAcceptedAt,
+    privacyPolicyVersionPresented: profile.privacyPolicyVersionPresented,
   }
 }
 
@@ -104,6 +109,10 @@ export function registerProfile(state, input) {
   const username = normalizeEmail(input.username)
   const password = String(input.password ?? '')
   const displayName = String(input.displayName ?? '').trim()
+
+  if (input.termsAccepted !== true) {
+    throw new Error('Zaakceptuj Regulamin FURA, aby utworzyć profil')
+  }
 
   if (displayName.length < 2) {
     throw new Error('Podaj nazwę użytkownika')
@@ -122,6 +131,9 @@ export function registerProfile(state, input) {
     displayName,
     createdAt: timestamp,
     updatedAt: timestamp,
+    termsVersion: TERMS_VERSION,
+    termsAcceptedAt: timestamp,
+    privacyPolicyVersionPresented: PRIVACY_POLICY_VERSION,
   }
 
   const passwordData = createPasswordHash(password)

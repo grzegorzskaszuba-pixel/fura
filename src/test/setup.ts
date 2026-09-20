@@ -42,6 +42,7 @@ beforeEach(async () => {
     username: 'tester@example.com',
     displayName: 'Tester',
     password: 'haslo123',
+    termsAccepted: true,
   })
 
   const primaryVehicle = await vehicleRepository.create(profile.id, {

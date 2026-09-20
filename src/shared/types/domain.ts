@@ -21,6 +21,9 @@ export interface UserProfile {
   displayName?: string
   createdAt: string
   updatedAt: string
+  termsVersion?: string
+  termsAcceptedAt?: string
+  privacyPolicyVersionPresented?: string
 }
 
 export interface Vehicle {
@@ -90,6 +93,9 @@ export interface AppStateRecord {
 export interface ProfileCreateInput {
   username: string
   displayName?: string
+  termsVersion?: string
+  termsAcceptedAt?: string
+  privacyPolicyVersionPresented?: string
 }
 
 export interface LoginCredentials {
@@ -101,6 +107,7 @@ export interface RegisterCredentials {
   username: string
   password: string
   displayName?: string
+  termsAccepted: boolean
 }
 
 export interface AuthCredentialRecord {

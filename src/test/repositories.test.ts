@@ -246,6 +246,7 @@ describe('Repositories', () => {
       username: 'repo-delete-account@example.com',
       displayName: 'Repo Delete Account',
       password: 'secret123',
+      termsAccepted: true,
     })
     const vehicle = await vehicleRepository.create(profile.id, {
       name: 'Volvo V60',

@@ -23,6 +23,9 @@ function toProfileRecord(input: ProfileCreateInput): UserProfile {
     displayName: input.displayName?.trim() || undefined,
     createdAt: now,
     updatedAt: now,
+    termsVersion: input.termsVersion,
+    termsAcceptedAt: input.termsAcceptedAt,
+    privacyPolicyVersionPresented: input.privacyPolicyVersionPresented,
   }
 }
 

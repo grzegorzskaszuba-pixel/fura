@@ -23,7 +23,50 @@ describe('Auth screen regression', () => {
 
     expect(await screen.findByRole('button', { name: 'Logowanie' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Rejestracja' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Logowanie' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'Rejestracja' })).toHaveAttribute('aria-pressed', 'false')
     expect(screen.queryByRole('button', { name: 'Reset' })).not.toBeInTheDocument()
+  })
+
+  it('shows legal links and requires terms acceptance only when registering', async () => {
+    const user = userEvent.setup()
+    const onRegister = vi.fn().mockResolvedValue(undefined)
+
+    render(
+      <AuthScreen
+        onLogin={async () => undefined}
+        onRegister={onRegister}
+      />,
+    )
+
+    expect(screen.getByRole('link', { name: 'Regulamin' })).toHaveAttribute('href', 'https://fura.info/regulamin')
+    expect(screen.getByRole('link', { name: 'Polityka prywatności' })).toHaveAttribute('href', 'https://fura.info/polityka-prywatnosci')
+    expect(screen.getByRole('link', { name: 'Bezpieczeństwo' })).toHaveAttribute('href', 'https://fura.info/bezpieczenstwo')
+    expect(screen.getByRole('link', { name: 'Kontakt' })).toHaveAttribute('href', 'mailto:kontakt@fura.info')
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Rejestracja' }))
+
+    expect(screen.getByRole('checkbox', { name: /Akceptuję Regulamin FURA/ })).toBeInTheDocument()
+    await user.type(screen.getByLabelText('E-mail użytkownika'), 'new-driver@example.com')
+    await user.type(screen.getByLabelText('Hasło'), 'secret123')
+    await user.type(screen.getByLabelText('Nazwa użytkownika'), 'New Driver')
+    await user.click(screen.getByRole('button', { name: 'Utwórz profil' }))
+
+    expect(onRegister).not.toHaveBeenCalled()
+    expect(screen.getByText('Zaakceptuj Regulamin FURA')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('checkbox', { name: /Akceptuję Regulamin FURA/ }))
+    await user.click(screen.getByRole('button', { name: 'Utwórz profil' }))
+
+    await waitFor(() => {
+      expect(onRegister).toHaveBeenCalledWith({
+        username: 'new-driver@example.com',
+        password: 'secret123',
+        displayName: 'New Driver',
+        termsAccepted: true,
+      })
+    })
   })
 
   it('uses the interactive brand logo and changes its phase', async () => {
