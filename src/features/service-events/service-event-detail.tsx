@@ -136,8 +136,8 @@ export function ServiceEventDetail({ event, vehicle, open, onOpenChange, onEdit,
                   data-testid={`attachment-thumbnail-${index}`}
                   aria-label={`Otwórz załącznik ${index + 1}`}
                   className={cn(
-                    'h-16 w-16 shrink-0 overflow-hidden rounded-full border-2 bg-zinc-50 p-1 transition sm:h-20 sm:w-20',
-                    index === activeAttachmentIndex ? 'border-zinc-950 ring-2 ring-zinc-950/10' : 'border-zinc-200 hover:border-zinc-300',
+                    'h-16 w-16 shrink-0 overflow-hidden rounded-full border border-zinc-200/80 bg-zinc-50 transition sm:h-20 sm:w-20',
+                    index === activeAttachmentIndex ? 'border-zinc-400 ring-2 ring-zinc-950/10' : 'hover:border-zinc-300',
                   )}
                   onClick={() => {
                     selectAttachment(index)
@@ -251,7 +251,7 @@ function AttachmentPreview({ attachment, compact = false, enlarged = false }: { 
       <img
         src={attachment.previewUrl}
         alt={attachment.name}
-        className={cn('h-full w-full bg-zinc-100 object-contain', compact ? 'rounded-full p-1.5' : '', enlarged ? 'max-h-full' : '')}
+        className={cn('h-full w-full bg-zinc-100 object-cover', compact ? 'rounded-full' : '', enlarged ? 'max-h-full' : '')}
       />
     )
   }

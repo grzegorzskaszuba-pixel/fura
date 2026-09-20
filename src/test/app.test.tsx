@@ -149,7 +149,10 @@ describe('App MVP flow', () => {
 
     expect(await screen.findByTestId('attachment-gallery')).toBeInTheDocument()
     expect(screen.queryByText('silnik-po-serwisie.png')).not.toBeInTheDocument()
-    expect(screen.getByTestId('attachment-thumbnail-0').querySelector('img')).toHaveClass('rounded-full')
+    expect(screen.getByTestId('attachment-thumbnail-0')).toHaveClass('border')
+    expect(screen.getByTestId('attachment-thumbnail-0')).not.toHaveClass('border-2', 'p-1')
+    expect(screen.getByTestId('attachment-thumbnail-0').querySelector('img')).toHaveClass('rounded-full', 'object-cover')
+    expect(screen.getByTestId('attachment-thumbnail-0').querySelector('img')).not.toHaveClass('object-contain', 'p-1.5')
     expect(screen.getByTestId('attachment-thumbnail-1').querySelector('div')).toHaveClass('rounded-full')
 
     await user.click(screen.getByTestId('attachment-thumbnail-1'))
