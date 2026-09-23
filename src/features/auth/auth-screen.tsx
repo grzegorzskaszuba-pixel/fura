@@ -205,7 +205,7 @@ export function AuthScreen({ onLogin, onRegister, onRequestPasswordReset, allowR
                         <input id="terms-accepted" type="checkbox" className="mt-1 h-4 w-4 shrink-0 accent-zinc-950" disabled={isSubmitting} {...form.register('termsAccepted')} />
                         <span>
                           Akceptuję{' '}
-                          <a className="font-medium text-zinc-950 underline underline-offset-4" href={LEGAL_DOCUMENTS.terms.href} target="_blank" rel="noreferrer">
+                          <a className="font-medium text-zinc-950 underline underline-offset-4" href={LEGAL_DOCUMENTS.terms.href}>
                             Regulamin FURA
                           </a>
                         </span>
@@ -234,13 +234,13 @@ export function AuthScreen({ onLogin, onRegister, onRequestPasswordReset, allowR
         </CardContent>
       </Card>
       <nav aria-label="Dokumenty i kontakt" className="mt-5 flex flex-wrap justify-center gap-x-4 gap-y-2 px-3 text-xs text-zinc-600">
-        <a href={LEGAL_DOCUMENTS.terms.href} target="_blank" rel="noreferrer" className="underline-offset-4 hover:text-zinc-950 hover:underline">
+        <a href={LEGAL_DOCUMENTS.terms.href} className="underline-offset-4 hover:text-zinc-950 hover:underline">
           Regulamin
         </a>
-        <a href={LEGAL_DOCUMENTS.privacyPolicy.href} target="_blank" rel="noreferrer" className="underline-offset-4 hover:text-zinc-950 hover:underline">
+        <a href={LEGAL_DOCUMENTS.privacyPolicy.href} className="underline-offset-4 hover:text-zinc-950 hover:underline">
           Polityka prywatności
         </a>
-        <a href={LEGAL_DOCUMENTS.security.href} target="_blank" rel="noreferrer" className="underline-offset-4 hover:text-zinc-950 hover:underline">
+        <a href={LEGAL_DOCUMENTS.security.href} className="underline-offset-4 hover:text-zinc-950 hover:underline">
           Bezpieczeństwo
         </a>
         <a href={LEGAL_DOCUMENTS.contact.href} className="underline-offset-4 hover:text-zinc-950 hover:underline">

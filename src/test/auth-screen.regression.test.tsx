@@ -43,11 +43,16 @@ describe('Auth screen regression', () => {
     expect(screen.getByRole('link', { name: 'Polityka prywatności' })).toHaveAttribute('href', 'https://fura.info/polityka-prywatnosci')
     expect(screen.getByRole('link', { name: 'Bezpieczeństwo' })).toHaveAttribute('href', 'https://fura.info/bezpieczenstwo')
     expect(screen.getByRole('link', { name: 'Kontakt' })).toHaveAttribute('href', 'mailto:kontakt@fura.info')
+    expect(screen.getByRole('link', { name: 'Regulamin' })).not.toHaveAttribute('target')
+    expect(screen.getByRole('link', { name: 'Polityka prywatności' })).not.toHaveAttribute('target')
+    expect(screen.getByRole('link', { name: 'Bezpieczeństwo' })).not.toHaveAttribute('target')
+    expect(screen.getByRole('link', { name: 'Kontakt' })).not.toHaveAttribute('target')
     expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Rejestracja' }))
 
     expect(screen.getByRole('checkbox', { name: /Akceptuję Regulamin FURA/ })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Regulamin FURA' })).not.toHaveAttribute('target')
     await user.type(screen.getByLabelText('E-mail użytkownika'), 'new-driver@example.com')
     await user.type(screen.getByLabelText('Hasło'), 'secret123')
     await user.type(screen.getByLabelText('Nazwa użytkownika'), 'New Driver')
